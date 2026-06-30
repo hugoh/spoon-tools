@@ -290,7 +290,7 @@ def to_html(module: dict, repo_url: str) -> str:
 
 
 def main() -> None:
-    repo_root = Path(__file__).parent.parent
+    repo_root = Path.cwd()
     lua_file = repo_root / "init.lua"
     out_dir = repo_root / "docs"
     out_dir.mkdir(exist_ok=True)
