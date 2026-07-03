@@ -18,15 +18,15 @@ local Common = new Group {
         ["markdown"]      = Builtins.rumdl
         ["dprint"]        = Builtins.dprint
         ["zizmor"]        = Builtins.zizmor
+        ["typos"]         = Builtins.typos
+        ["mise"]          = Builtins.mise
     }
 }
 
 local linters = new Mapping<String, Step> {
     ...Common.steps
-    ["mise"]   = Builtins.mise
     ["python"] = Builtins.ruff
     ["toml"]   = Builtins.tombi
-    ["typos"]  = Builtins.typos
 }
 
 hooks {
