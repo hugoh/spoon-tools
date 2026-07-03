@@ -1,32 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    ":automergeAll",
-    ":automergeBranch",
-    "config:best-practices",
-    "schedule:monthly"
-  ],
-  "vulnerabilityAlerts": {
-    "labels": ["security"],
-    "automerge": true,
-    "schedule": ["at any time"]
-  },
+  "extends": ["github>hugoh/renovate-config"],
   "packageRules": [
-    {
-      "matchUpdateTypes": ["major"],
-      "groupName": "major updates",
-      "automerge": false
-    },
-    {
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "matchManagers": ["!github-actions"],
-      "groupName": "non-major updates"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "groupName": "github actions updates"
-    },
     {
       "matchManagers": ["mise"],
       "matchDepNames": ["lua"],

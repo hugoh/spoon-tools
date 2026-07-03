@@ -65,9 +65,9 @@ jobs:
 
 **Inputs:**
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `pre_test` | No | Shell command to run before `mise run test` |
+| Input      | Required | Description                                 |
+| ---------- | -------- | ------------------------------------------- |
+| `pre_test` | No       | Shell command to run before `mise run test` |
 
 ### `spoon-release.yml` — release and deploy docs
 
@@ -89,9 +89,9 @@ jobs:
 
 **Inputs:**
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `spoon_name` | Yes | Spoon name (e.g. `AudioPilot`); used for the zip filename |
+| Input        | Required | Description                                               |
+| ------------ | -------- | --------------------------------------------------------- |
+| `spoon_name` | Yes      | Spoon name (e.g. `AudioPilot`); used for the zip filename |
 
 The calling repo must have GitHub Pages enabled (source: GitHub Actions) and the `github-pages` environment configured.
 
