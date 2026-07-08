@@ -1,4 +1,4 @@
-name: CI
+name: hk
 
 permissions: {}
 
@@ -10,10 +10,8 @@ on: # yamllint disable-line rule:truthy
   pull_request:
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  lint:
+    timeout-minutes: 5
     concurrency:
       group: ${{ github.workflow }}-${{ github.event.pull_request.number ||
         github.ref }}
@@ -22,10 +20,14 @@ jobs:
       contents: read
       packages: read
       statuses: write
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
       - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
-      - name: Smoke test entry point
-        run: uvx --from . spoon-generate-docs --help || true
+      - name: hk checks
+        run: hk check --no-progress --profile ci --all
+      - name: Display hk log on failure
+        if: failure()
+        run: cat /home/runner/.local/state/hk/output.log
