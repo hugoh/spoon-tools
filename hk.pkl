@@ -26,6 +26,7 @@ local Common = new Group {
 local linters = new Mapping<String, Step> {
     ...Common.steps
     ["python"] = Builtins.ruff
+    ["ty"]     = Builtins.ty
     ["toml"]   = Builtins.tombi
 }
 
