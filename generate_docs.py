@@ -278,7 +278,11 @@ def to_html(module: dict, repo_url: str) -> str:
                 f"</div>"
             )
 
-    version_line = f'<span style="font-size:.85em;color:#6b7280">v{h(module["version"])} &mdash; </span>' if module["version"] else ""
+    version_line = (
+        f'<span style="font-size:.85em;color:#6b7280">v{h(module["version"])} &mdash; </span>'
+        if module["version"]
+        else ""
+    )
     return _HTML.format(
         name=h(module["name"]),
         version_line=version_line,
@@ -301,7 +305,9 @@ def main() -> None:
     module["version"] = extract_version(source)
 
     if not module["name"]:
-        print("ERROR: No module header (=== Name ===) found in init.lua", file=sys.stderr)
+        print(
+            "ERROR: No module header (=== Name ===) found in init.lua", file=sys.stderr
+        )
         sys.exit(1)
 
     repo_url = _repo_url(repo_root)
