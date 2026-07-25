@@ -5,7 +5,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date
+from datetime import UTC, datetime
 from html import escape as h
 from pathlib import Path
 
@@ -36,8 +36,7 @@ def extract_blocks(source: str) -> list[list[str]]:
         line = raw_line.rstrip()
         if line.startswith("---"):
             content = line[3:]
-            if content.startswith(" "):
-                content = content[1:]
+            content = content.removeprefix(" ")
             current.append(content)
         else:
             if current:
@@ -81,9 +80,8 @@ def parse_sections(body: list[str]) -> dict:
             current = notes
         elif stripped.startswith("* "):
             current.append(stripped[2:])
-        elif current is desc_lines:
-            if stripped or desc_lines:
-                desc_lines.append(line.strip())
+        elif current is desc_lines and (stripped or desc_lines):
+            desc_lines.append(line.strip())
 
     return {
         "desc": " ".join(desc_lines).strip(),
@@ -288,7 +286,7 @@ def to_html(module: dict, repo_url: str) -> str:
         version_line=version_line,
         desc=h(module["desc"]),
         repo_url=repo_url,
-        today=date.today().isoformat(),
+        today=datetime.now(tz=UTC).date().isoformat(),
         body="\n".join(sections),
     )
 
