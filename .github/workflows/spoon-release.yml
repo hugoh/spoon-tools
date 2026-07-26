@@ -17,13 +17,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: hugoh/gh-workflows/setup@5728acd8585f1fa9ab6cda75efe49fce98fb5ac9 # v1.7.0
         with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
-        with:
-          cache: false
+          fetch-depth: "0"
       - name: Update version in init.lua
         env:
           TAG_NAME: ${{ github.ref_name }}
