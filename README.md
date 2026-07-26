@@ -69,6 +69,28 @@ jobs:
 | ---------- | -------- | ------------------------------------------- |
 | `pre_test` | No       | Shell command to run before `mise run test` |
 
+### `spoon-tag.yml` — auto-tag on merge
+
+Triggered by a push to `main`. Inspects Conventional Commits since the last `v*` tag and pushes the next `vX.Y.Z` tag — nothing is tagged when there's no `feat`/`fix`/breaking change to release (e.g. chore-only merges). Pushing the tag triggers `spoon-release.yml` below, so no separate release step is needed here.
+
+```yaml
+name: Tag
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    uses: hugoh/spoon-tools/.github/workflows/spoon-tag.yml@main
+```
+
 ### `spoon-release.yml` — release and deploy docs
 
 Triggered by a `v*` tag push. Updates `obj.version` in `init.lua`, packages the spoon zip, creates a GitHub Release, and deploys `docs/` to GitHub Pages.
