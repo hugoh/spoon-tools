@@ -5,6 +5,10 @@ on:
         description: Spoon name (e.g. AudioPilot) — used for the zip filename
         type: string
         required: true
+      tag:
+        description: Tag to package/release (defaults to the triggering ref's tag). Lets release.yml be re-run for a specific tag via workflow_dispatch.
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -20,9 +24,13 @@ jobs:
       - uses: hugoh/gh-workflows/setup@5728acd8585f1fa9ab6cda75efe49fce98fb5ac9 # v1.7.0
         with:
           fetch-depth: "0"
+      - name: Checkout tag to release
+        env:
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
+        run: git checkout "$TAG_NAME"
       - name: Update version in init.lua
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
         run: |
           VERSION=${TAG_NAME#v}
           sed -i "s/obj.version = \"[^\"]*\"/obj.version = \"$VERSION\"/" init.lua
@@ -33,7 +41,7 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
           SPOON_NAME: ${{ inputs.spoon_name }}
         run: gh release create "$TAG_NAME" "${SPOON_NAME}.spoon.zip" --notes-file RELEASE_NOTES.md
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
