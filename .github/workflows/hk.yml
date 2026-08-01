@@ -22,5 +22,5 @@ jobs:
       statuses: write
     runs-on: ubuntu-latest
     steps:
-      - uses: hugoh/gh-workflows/setup@2a893c747fce415485c87b137ba730494f355f27 # v1.6.0
-      - uses: hugoh/gh-workflows/hk-check@2a893c747fce415485c87b137ba730494f355f27 # v1.6.0
+      - uses: hugoh/gh-workflows/setup@5728acd8585f1fa9ab6cda75efe49fce98fb5ac9 # v1.7.0
+      - uses: hugoh/gh-workflows/hk-check@5728acd8585f1fa9ab6cda75efe49fce98fb5ac9 # v1.7.0
