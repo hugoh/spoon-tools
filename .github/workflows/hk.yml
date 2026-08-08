@@ -22,7 +22,7 @@ jobs:
       statuses: write
     runs-on: ubuntu-latest
     steps:
-      - uses: hugoh/gh-workflows/setup@5728acd8585f1fa9ab6cda75efe49fce98fb5ac9 # v1.7.0
-      - uses: hugoh/gh-workflows/hk-check@5728acd8585f1fa9ab6cda75efe49fce98fb5ac9 # v1.7.0
+      - uses: hugoh/gh-workflows/setup@6b3318af9824bf310afc501232f53a99083296cd # v1.7.1
+      - uses: hugoh/gh-workflows/hk-check@6b3318af9824bf310afc501232f53a99083296cd # v1.7.1
         env:
           PINACT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
