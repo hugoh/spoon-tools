@@ -23,16 +23,12 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Bump version and push tag
-        id: tag_bump
-        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
-        with:
-          github_token: ${{ github.token }}
-          default_bump: false
+      - id: bump
+        uses: hugoh/gh-workflows/cog-bump@1d2a18056f2122b7f49c2e8aacb48c40cb6eaab9 # v1.24.0
 
       - name: Trigger release for new tag
-        if: steps.tag_bump.outputs.new_tag != ''
+        if: steps.bump.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          NEW_TAG: ${{ steps.tag_bump.outputs.new_tag }}
+          NEW_TAG: ${{ steps.bump.outputs.tag }}
         run: gh workflow run release.yml --ref "$NEW_TAG"

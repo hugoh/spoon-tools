@@ -42,14 +42,12 @@ jobs:
           sed -i "s/obj.version = \"[^\"]*\"/obj.version = \"$VERSION\"/" init.lua
       - name: Package Spoon
         run: mise run package
-      - name: Generate release notes
-        run: git cliff --latest --strip header -o RELEASE_NOTES.md
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag || github.ref_name }}
           SPOON_NAME: ${{ inputs.spoon_name }}
-        run: gh release create "$TAG_NAME" "${SPOON_NAME}.spoon.zip" --notes-file RELEASE_NOTES.md
+        run: gh release create "$TAG_NAME" "${SPOON_NAME}.spoon.zip" --generate-notes
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/
