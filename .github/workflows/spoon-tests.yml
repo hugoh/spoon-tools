@@ -26,6 +26,9 @@ jobs:
         if: inputs.pre_test != ''
         env:
           PRE_TEST_CMD: ${{ inputs.pre_test }}
+        # Word-splitting is intentional: pre_test is a full command line
+        # (e.g. "mise run vendor") supplied by the calling repo.
+        # shellcheck disable=SC2086
         run: $PRE_TEST_CMD
       - name: Run tests
         run: mise run test

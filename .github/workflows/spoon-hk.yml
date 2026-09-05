@@ -9,6 +9,9 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.job }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
       packages: read

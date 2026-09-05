@@ -4,6 +4,11 @@ on:
 permissions:
   contents: read
 
+# Scoped to the calling spoon repo. Serialize tag bumps; never cancel one.
+concurrency:
+  group: tag
+  cancel-in-progress: false
+
 jobs:
   tag:
     name: Tag

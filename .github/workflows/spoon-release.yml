@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# Scoped to the calling spoon repo. Serialize releases (and the Pages deploy
+# that needs them); never cancel one mid-publish.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Release
