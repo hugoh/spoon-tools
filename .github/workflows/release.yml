@@ -1,3 +1,4 @@
+---
 name: release
 
 on: # yamllint disable-line rule:truthy
@@ -7,47 +8,22 @@ on: # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to create a GitHub Release for (skips bumping; requires notes)
+        description: Existing tag to create a GitHub Release for; skips the bump
         required: false
         type: string
       notes:
-        description: Release notes body (required when tag is set)
+        description: "Release notes body (default: GitHub auto-generated notes)"
         required: false
         type: string
 
 permissions:
   contents: write
 
-concurrency:
-  group: release
-  cancel-in-progress: false
-
 jobs:
   release:
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Bump version and push tag
-        id: tag_version
-        if: inputs.tag == ''
-        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: false
-
-      - name: Create a GitHub release
-        if: inputs.tag != '' || steps.tag_version.outputs.new_tag != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_TAG: ${{ inputs.tag != '' && inputs.tag || steps.tag_version.outputs.new_tag }}
-          CHANGELOG: ${{ inputs.notes != '' && inputs.notes || steps.tag_version.outputs.changelog }}
-        run: |
-          gh release create "$NEW_TAG" \
-            --verify-tag \
-            --title "Release $NEW_TAG" \
-            --notes "$CHANGELOG"
+    uses: hugoh/gh-workflows/.github/workflows/release.yml@89be8ed3394b541d853b9dab2ab968fcc3db831a # v1.30.0
+    permissions:
+      contents: write
+    with:
+      tag: ${{ inputs.tag || '' }}
+      notes: ${{ inputs.notes || '' }}
