@@ -9,6 +9,12 @@ on:
         description: Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use.
         type: string
         required: false
+      bump:
+        description: >-
+          Force the bump level instead of deriving it from the commits: auto
+          (default), patch, minor, major. Ignored when tag is set.
+        type: string
+        default: auto
 
 permissions:
   contents: read
@@ -36,6 +42,8 @@ jobs:
       - id: bump
         if: inputs.tag == ''
         uses: hugoh/cog-bump@40cbe76b9059638912c9b3038f8c46844cf95cbc # v0.2.1
+        with:
+          bump: ${{ inputs.bump || 'auto' }}
 
       - id: resolve
         env:

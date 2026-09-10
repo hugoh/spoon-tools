@@ -83,7 +83,8 @@ The one workflow with spoon-specific glue: on push to `main` it runs the
 Conventional-Commit bump ([`hugoh/cog-bump`](https://github.com/hugoh/cog-bump)),
 and when that yields a new tag it stamps `obj.version` into `init.lua`, packages
 the spoon zip, creates a GitHub Release, and deploys `docs/` to GitHub Pages.
-Chore-only merges bump nothing and the job is a no-op.
+Chore-only merges bump nothing and the job is a no-op — dispatch with
+`bump: patch` to force a release from such history.
 
 ```yaml
 name: Release
@@ -96,6 +97,12 @@ on:
         description: Existing tag to (re-)release; leave empty for normal use
         required: false
         type: string
+      bump:
+        description: Force the bump level (auto = derive from commits)
+        required: false
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
 
 permissions:
   contents: write
@@ -108,6 +115,7 @@ jobs:
     with:
       spoon_name: MySpoon   # must match obj.name in init.lua
       tag: ${{ inputs.tag }}
+      bump: ${{ inputs.bump }}
 ```
 
 The calling repo must have GitHub Pages enabled (source: GitHub Actions) and the `github-pages` environment configured.
@@ -116,10 +124,11 @@ The calling repo must have GitHub Pages enabled (source: GitHub Actions) and the
 
 <!-- AUTO-DOC-INPUT:START - Do not remove or modify this section -->
 
-|   INPUT    | REQUIRED | DEFAULT |                                                DESCRIPTION                                                 |
-|------------|----------|---------|------------------------------------------------------------------------------------------------------------|
-| spoon_name |   true   |         |        Spoon name (e.g. AudioPilot) — used for the zip filename and must match obj.name in init.lua        |
-|    tag     |  false   |         | Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use. |
+|   INPUT    | REQUIRED | DEFAULT  |                                                         DESCRIPTION                                                         |
+|------------|----------|----------|-----------------------------------------------------------------------------------------------------------------------------|
+|    bump    |  false   | `"auto"` | Force the bump level instead of deriving it from the commits: auto (default), patch, minor, major. Ignored when tag is set. |
+| spoon_name |   true   |          |                Spoon name (e.g. AudioPilot) — used for the zip filename and must match obj.name in init.lua                 |
+|    tag     |  false   |          |         Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use.          |
 
 <!-- AUTO-DOC-INPUT:END -->
 
