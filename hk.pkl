@@ -7,6 +7,15 @@ min_hk_version = Base.min_hk_version
 local linters = new Mapping<String, Step> {
     ...Base.base
     ...Base.python
+    ["readme-gen"] = {
+        glob = List(
+            ".github/workflows/spoon-release.yml",
+            "README.md",
+            "mise.toml"
+        )
+        check = "mise run gen-check"
+        fix = "mise run gen"
+    }
 }
 
 hooks {
