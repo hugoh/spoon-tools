@@ -11,6 +11,16 @@ on: # yamllint disable-line rule:truthy
         description: Existing tag to create a GitHub Release for; skips the bump
         required: false
         type: string
+      bump:
+        description: Force the bump level (auto = derive from commits). Ignored when tag is set.
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - patch
+          - minor
+          - major
       notes:
         description: "Release notes body (default: GitHub auto-generated notes)"
         required: false
@@ -21,9 +31,10 @@ permissions:
 
 jobs:
   release:
-    uses: hugoh/gh-workflows/.github/workflows/release.yml@89be8ed3394b541d853b9dab2ab968fcc3db831a # v1.30.0
+    uses: hugoh/gh-workflows/.github/workflows/release.yml@2d58c2d886399dca718e4de89f8c7d0ccd2c749e # v1.38.0
     permissions:
       contents: write
     with:
       tag: ${{ inputs.tag || '' }}
+      bump: ${{ inputs.bump || 'auto' }}
       notes: ${{ inputs.notes || '' }}
