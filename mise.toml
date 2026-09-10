@@ -13,7 +13,30 @@ typos = "1.50.1"
 ty = "0.0.78"
 uv = "0.12.10"
 zizmor = "1.30.0"
+"github:tj-actions/auto-doc" = "3.6.0"
 
 [tasks.docs-test]
 run = "uvx --from . spoon-generate-docs"
 description = "Smoke-test the CLI entry point locally"
+
+[tasks.gen]
+description = "Regenerate the spoon-release.yml Inputs/Outputs tables in the README"
+run = """
+set -e
+auto-doc --reusable --filename .github/workflows/spoon-release.yml --output README.md \\
+  --reusableInputColumns Input --reusableInputColumns Required --reusableInputColumns Default --reusableInputColumns Description \\
+  --reusableOutputColumns Output --reusableOutputColumns Description \\
+  --reusableSecretColumns Secret --reusableSecretColumns Required --reusableSecretColumns Description \\
+  --colMaxWords 100
+rumdl check --fix README.md
+"""
+
+[tasks.gen-check]
+description = "Verify the generated README tables are in sync"
+run = """
+set -e
+before=$(shasum -a 256 README.md | shasum -a 256)
+mise run gen
+after=$(shasum -a 256 README.md | shasum -a 256)
+[ "$before" = "$after" ] || { echo 'README tables are out of date — run: mise run gen'; exit 1; }
+"""

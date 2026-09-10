@@ -21,13 +21,12 @@ uvx --from git+https://github.com/hugoh/spoon-tools spoon-generate-docs
 
 ---
 
-## Reusable workflows
+## Workflows
 
-Reference these from a spoon's `.github/workflows/` directory with `uses:`.
+Lint and tests need nothing spoon-specific — call
+[`hugoh/gh-workflows`](https://github.com/hugoh/gh-workflows) directly.
 
-### `spoon-hk.yml` — lint checks
-
-Runs `hk check` (via mise). Use for push/PR CI.
+### `hk.yml` — lint checks
 
 ```yaml
 name: hk
@@ -36,18 +35,24 @@ on:
     branches: [main, renovate/**]
   pull_request:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
+  packages: read
+  statuses: write
 
 jobs:
   check:
-    uses: hugoh/spoon-tools/.github/workflows/spoon-hk.yml@main
+    uses: hugoh/gh-workflows/.github/workflows/hk.yml@<pinned-sha>
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
 ```
 
-### `spoon-tests.yml` — Lua tests
+### `tests.yml` — Lua tests
 
-Runs `mise run test` (busted). Accepts an optional `pre_test` command to run first (used by AudioPilot to vendor JS dependencies).
+`setup` (checkout + mise) then `mise run test` (busted). Interleave any extra
+step — e.g. AudioPilot vendors JS deps first.
 
 ```yaml
 name: Tests
@@ -56,66 +61,73 @@ on:
     branches: [main, renovate/**]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    uses: hugoh/spoon-tools/.github/workflows/spoon-tests.yml@main
-    # with:
-    #   pre_test: mise run vendor   # AudioPilot only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: hugoh/gh-workflows/setup@<pinned-sha>
+      # - run: mise run vendor   # AudioPilot only
+      - run: mise run test
 ```
 
-**Inputs:**
+### `spoon-release.yml` — tag, release, deploy docs
 
-| Input      | Required | Description                                 |
-| ---------- | -------- | ------------------------------------------- |
-| `pre_test` | No       | Shell command to run before `mise run test` |
-
-### `spoon-tag.yml` — auto-tag on merge
-
-Triggered by a push to `main`. Inspects Conventional Commits since the last `v*` tag and pushes the next `vX.Y.Z` tag — nothing is tagged when there's no `feat`/`fix`/breaking change to release (e.g. chore-only merges). Pushing the tag triggers `spoon-release.yml` below, so no separate release step is needed here.
-
-```yaml
-name: Tag
-on:
-  push:
-    branches: [main]
-
-permissions:
-  contents: write
-
-concurrency:
-  group: tag
-  cancel-in-progress: false
-
-jobs:
-  tag:
-    uses: hugoh/spoon-tools/.github/workflows/spoon-tag.yml@main
-```
-
-### `spoon-release.yml` — release and deploy docs
-
-Triggered by a `v*` tag push. Updates `obj.version` in `init.lua`, packages the spoon zip, creates a GitHub Release, and deploys `docs/` to GitHub Pages.
+The one workflow with spoon-specific glue: on push to `main` it runs the
+Conventional-Commit bump ([`hugoh/cog-bump`](https://github.com/hugoh/cog-bump)),
+and when that yields a new tag it stamps `obj.version` into `init.lua`, packages
+the spoon zip, creates a GitHub Release, and deploys `docs/` to GitHub Pages.
+Chore-only merges bump nothing and the job is a no-op.
 
 ```yaml
 name: Release
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re-)release; leave empty for normal use
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   release:
-    uses: hugoh/spoon-tools/.github/workflows/spoon-release.yml@main
+    uses: hugoh/spoon-tools/.github/workflows/spoon-release.yml@<pinned-sha>
     with:
       spoon_name: MySpoon   # must match obj.name in init.lua
-    secrets: inherit
+      tag: ${{ inputs.tag }}
 ```
 
-**Inputs:**
-
-| Input        | Required | Description                                               |
-| ------------ | -------- | --------------------------------------------------------- |
-| `spoon_name` | Yes      | Spoon name (e.g. `AudioPilot`); used for the zip filename |
-
 The calling repo must have GitHub Pages enabled (source: GitHub Actions) and the `github-pages` environment configured.
+
+#### Inputs
+
+<!-- AUTO-DOC-INPUT:START - Do not remove or modify this section -->
+
+|   INPUT    | REQUIRED | DEFAULT |                                                DESCRIPTION                                                 |
+|------------|----------|---------|------------------------------------------------------------------------------------------------------------|
+| spoon_name |   true   |         |        Spoon name (e.g. AudioPilot) — used for the zip filename and must match obj.name in init.lua        |
+|    tag     |  false   |         | Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use. |
+
+<!-- AUTO-DOC-INPUT:END -->
+
+#### Outputs
+
+<!-- AUTO-DOC-OUTPUT:START - Do not remove or modify this section -->
+No outputs.
+<!-- AUTO-DOC-OUTPUT:END -->
 
 ---
 
