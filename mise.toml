@@ -35,8 +35,6 @@ rumdl check --fix README.md
 description = "Verify the generated README tables are in sync"
 run = """
 set -e
-before=$(shasum -a 256 README.md | shasum -a 256)
 mise run gen
-after=$(shasum -a 256 README.md | shasum -a 256)
-[ "$before" = "$after" ] || { echo 'README tables are out of date — run: mise run gen'; exit 1; }
+git diff --exit-code README.md || { echo 'README tables are out of date — run: mise run gen'; exit 1; }
 """
