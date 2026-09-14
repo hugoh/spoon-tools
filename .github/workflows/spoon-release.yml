@@ -35,13 +35,13 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
     steps:
-      - uses: hugoh/gh-workflows/setup@9a9a819da88d69f50842f77fdaa4fa103f5ca7cd # v1.38.3
+      - uses: hugoh/gh-workflows/setup@0e87e19c850cf07d9e32b37416a6b60ab6a666dd # v1.38.4
         with:
           fetch-depth: "0"
 
       - id: bump
         if: inputs.tag == ''
-        uses: hugoh/cog-bump@b9d53e375fd629d1e1414b67bcd26e92ce098475 # v0.2.2
+        uses: hugoh/cog-bump@28b566ea06d6f6fd5e88054d4216932c386cca1f # v0.3.0
         with:
           bump: ${{ inputs.bump || 'auto' }}
 
