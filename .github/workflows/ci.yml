@@ -22,6 +22,6 @@ jobs:
       packages: read
       statuses: write
     steps:
-      - uses: hugoh/gh-workflows/setup@ae1366a14513d42c78dd993d7fbb776fda2d4530 # v1.38.6
+      - uses: hugoh/gh-workflows/setup@30c65c10c5d685575b7c475516b635f79bd128b5 # v1.39.0
       - name: Smoke test entry point
         run: uvx --from . spoon-generate-docs --help || true
