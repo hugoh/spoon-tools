@@ -19,6 +19,10 @@ zizmor = "1.30.0"
 run = "uvx --from . spoon-generate-docs"
 description = "Smoke-test the CLI entry point locally"
 
+[tasks.test]
+run = "uv run --group dev pytest"
+description = "Run the Python test suite"
+
 [tasks.gen]
 description = "Regenerate the spoon-release.yml Inputs/Outputs tables in the README"
 run = """

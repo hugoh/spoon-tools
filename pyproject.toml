@@ -7,6 +7,9 @@ requires-python = ">=3.11"
 [project.scripts]
 spoon-generate-docs = "generate_docs:main"
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
