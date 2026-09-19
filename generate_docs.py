@@ -24,6 +24,10 @@ def _repo_url(repo_root: Path) -> str:
     m = re.match(r"git@([^:]+):(.+?)(?:\.git)?$", raw)
     if m:
         return f"https://{m.group(1)}/{m.group(2)}"
+    # Strip embedded credentials (e.g. https://x-access-token:TOKEN@github.com/...)
+    m = re.match(r"https://(?:[^@/]+@)?(.+)", raw)
+    if m:
+        raw = f"https://{m.group(1)}"
     return raw.removesuffix(".git")
 
 
