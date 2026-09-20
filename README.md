@@ -127,6 +127,7 @@ The calling repo must have GitHub Pages enabled (source: GitHub Actions) and the
 |   INPUT    | REQUIRED | DEFAULT  |                                                         DESCRIPTION                                                         |
 |------------|----------|----------|-----------------------------------------------------------------------------------------------------------------------------|
 |    bump    |  false   | `"auto"` | Force the bump level instead of deriving it from the commits: auto (default), patch, minor, major. Ignored when tag is set. |
+| docs_only  |  false   | `false`  |      Regenerate and redeploy the Pages docs only; no bump, no GitHub Release. Uses `tag`, or the latest tag if empty.       |
 | spoon_name |   true   |          |                Spoon name (e.g. AudioPilot) — used for the zip filename and must match obj.name in init.lua                 |
 |    tag     |  false   |          |         Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use.          |
 
