@@ -21,9 +21,9 @@ jobs:
       statuses: write
     runs-on: ubuntu-latest
     steps:
-      - uses: hugoh/gh-workflows/setup@b95b3bd62a98e3c18adbd6ed7e22f50908a50467 # v1.40.1
+      - uses: hugoh/gh-workflows/setup@76cbcbdfd23f89a1fb565f4ee4c8964138bc28e7 # v1.40.2
       - name: Sync Python dependencies
         run: uv sync --group dev
-      - uses: hugoh/gh-workflows/hk-check@b95b3bd62a98e3c18adbd6ed7e22f50908a50467 # v1.40.1
+      - uses: hugoh/gh-workflows/hk-check@76cbcbdfd23f89a1fb565f4ee4c8964138bc28e7 # v1.40.2
         env:
           PINACT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
