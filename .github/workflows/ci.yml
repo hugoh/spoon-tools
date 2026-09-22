@@ -22,7 +22,7 @@ jobs:
       packages: read
       statuses: write
     steps:
-      - uses: hugoh/gh-workflows/setup@76cbcbdfd23f89a1fb565f4ee4c8964138bc28e7 # v1.40.2
+      - uses: hugoh/gh-workflows/setup@7cbb8fcf3a59c29229d6fd9feb02e46e0a02113a # v1.40.3
       - name: Run tests
         run: mise run test
       - name: Smoke test entry point
