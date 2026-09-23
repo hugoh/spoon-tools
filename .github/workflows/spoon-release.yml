@@ -83,7 +83,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.resolve.outputs.tag }}
           SPOON_NAME: ${{ inputs.spoon_name }}
-        run: gh release create "$TAG" "${SPOON_NAME}.spoon.zip" --generate-notes
+          COG_NOTES: ${{ steps.bump.outputs.notes }}
+        run: |
+          set -euo pipefail
+          # Prefer cog's Conventional-Commit changelog (grouped by feat/fix/...);
+          # fall back to GitHub's auto-generated notes when re-releasing a tag.
+          if [ -n "$COG_NOTES" ]; then
+            printf '%s' "$COG_NOTES" > "$RUNNER_TEMP/release-notes.md"
+            gh release create "$TAG" "${SPOON_NAME}.spoon.zip" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$TAG" "${SPOON_NAME}.spoon.zip" --verify-tag --title "$TAG" --generate-notes
+          fi
 
       - name: Scan generated docs for secrets
         if: steps.resolve.outputs.tag != ''
