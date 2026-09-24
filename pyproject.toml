@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "Shared scripts for Hammerspoon Spoon repositories"
 requires-python = ">=3.11"
 dependencies = [
-    "jinja2>=3.1",
-    "linkify-it-py>=2",
-    "markdown-it-py>=3",
+  "jinja2>=3.1",
+  "linkify-it-py>=2",
+  "markdown-it-py>=3",
 ]
 
 [project.scripts]
