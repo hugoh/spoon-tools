@@ -5,9 +5,13 @@ import json
 import re
 import subprocess
 import sys
+import textwrap
 from datetime import UTC, datetime
-from html import escape as h
 from pathlib import Path
+
+from jinja2 import Environment
+from markdown_it import MarkdownIt
+from markupsafe import Markup, escape
 
 
 def _repo_url(repo_root: Path) -> str:
@@ -31,67 +35,107 @@ def _repo_url(repo_root: Path) -> str:
     return raw.removesuffix(".git")
 
 
-def extract_blocks(source: str) -> list[list[str]]:
-    """Return a list of docstring blocks; each block is a list of content lines."""
-    blocks: list[list[str]] = []
-    current: list[str] = []
+# ---------------------------------------------------------------------------
+# Parsing
+# ---------------------------------------------------------------------------
 
-    for raw_line in source.splitlines():
+
+def extract_blocks(source: str) -> list[tuple[int, list[str]]]:
+    """Return docstring blocks as (first line number, content lines).
+
+    A docstring line is exactly ``---`` or starts with ``--- ``; the prefix is
+    removed and any further indentation is kept, so nested lists and wrapped
+    lines survive. ``----`` rules and ``---@`` annotations are not docstrings.
+    """
+    blocks: list[tuple[int, list[str]]] = []
+    current: list[str] = []
+    start = 0
+
+    for lineno, raw_line in enumerate(source.splitlines(), start=1):
         line = raw_line.rstrip()
-        if line.startswith("---"):
-            content = line[3:]
-            content = content.removeprefix(" ")
-            current.append(content)
-        else:
-            if current:
-                blocks.append(current)
-                current = []
+        if line == "---" or line.startswith("--- "):
+            if not current:
+                start = lineno
+            current.append(line[4:])
+        elif current:
+            blocks.append((start, current))
+            current = []
 
     if current:
-        blocks.append(current)
+        blocks.append((start, current))
 
     return blocks
 
 
-_ITEM_TYPES = frozenset(("Method", "Variable", "Function", "Constructor", "Field"))
+# Display order in the HTML page.
+_ITEM_TYPES = (
+    "Variable",
+    "Constant",
+    "Field",
+    "Constructor",
+    "Method",
+    "Function",
+    "Command",
+    "Deprecated",
+)
+
+_SECTIONS = {
+    "Parameters:": "parameters",
+    "Returns:": "returns",
+    "Notes:": "notes",
+    "Examples:": "examples",
+}
+
+_SIGNATURE_RE = re.compile(r"^(\w+)([.:])(\w+)")
+
+
+def _trim_blank(lines: list[str]) -> list[str]:
+    start, end = 0, len(lines)
+    while start < end and not lines[start].strip():
+        start += 1
+    while end > start and not lines[end - 1].strip():
+        end -= 1
+    return lines[start:end]
+
+
+def _first_paragraph(lines: list[str]) -> str:
+    para: list[str] = []
+    for line in _trim_blank(lines):
+        if not line.strip():
+            break
+        para.append(line.strip())
+    return " ".join(para)
+
+
+def _infer_type(signature: str) -> str:
+    m = _SIGNATURE_RE.match(signature)
+    if m and m.group(2) == ":":
+        return "Method"
+    return "Function" if "(" in signature else "Variable"
 
 
 def parse_sections(body: list[str]) -> dict:
-    """Parse a block body into desc, parameters, returns, and notes."""
+    """Split an item body (after the type line) into description and sections.
+
+    Section contents are kept as raw lines, as in Hammerspoon's own docs.json,
+    so wrapped and nested bullets are preserved.
+    """
     desc_lines: list[str] = []
-    parameters: list[str] = []
-    returns: list[str] = []
-    notes: list[str] = []
-    current: list[str] = desc_lines
-    past_type = False
+    sections: dict[str, list[str]] = {key: [] for key in _SECTIONS.values()}
+    current = desc_lines
 
     for line in body:
-        stripped = line.strip()
+        key = _SECTIONS.get(line.strip())
+        if key:
+            current = sections[key]
+        else:
+            current.append(line)
 
-        if not past_type:
-            if stripped in _ITEM_TYPES:
-                past_type = True
-                continue
-            if stripped == "":
-                continue
-            past_type = True  # no explicit type line; start collecting desc
-
-        if stripped == "Parameters:":
-            current = parameters
-        elif stripped == "Returns:":
-            current = returns
-        elif stripped == "Notes:":
-            current = notes
-        elif stripped.startswith("* "):
-            current.append(stripped[2:])
-        elif current is desc_lines and (stripped or desc_lines):
-            desc_lines.append(line.strip())
-
+    desc_lines = _trim_blank(desc_lines)
     return {
-        "desc": " ".join(desc_lines).strip(),
-        "parameters": parameters,
-        "returns": returns,
-        "notes": notes,
+        "desc": _first_paragraph(desc_lines),
+        "stripped_doc": "\n".join(desc_lines),
+        **{key: _trim_blank(lines) for key, lines in sections.items()},
     }
 
 
@@ -101,54 +145,62 @@ def extract_version(source: str) -> str:
     return m.group(1) if m else ""
 
 
-def parse_module(blocks: list[list[str]]) -> dict:
-    """Parse all blocks into a structured module dict."""
-    module: dict = {"name": "", "version": "", "desc": "", "doc": "", "items": []}
+def parse_module(blocks: list[tuple[int, list[str]]]) -> dict:
+    """Parse all blocks into a structured module dict.
 
-    for block in blocks:
+    Problems found along the way are collected in ``module["warnings"]`` as
+    ``(line number, message)`` pairs.
+    """
+    module: dict = {
+        "name": "",
+        "version": "",
+        "desc": "",
+        "doc": "",
+        "items": [],
+        "warnings": [],
+    }
+
+    def warn(lineno: int, msg: str) -> None:
+        module["warnings"].append((lineno, msg))
+
+    for lineno, block in blocks:
         if not block:
             continue
-        first = block[0]
+        first = block[0].strip()
 
         m = re.match(r"^=== (\w+) ===$", first)
         if m:
             module["name"] = m.group(1)
-            body = block[1:]
-            module["doc"] = "\n".join(body).strip()
-            for line in body:
-                if line.strip():
-                    module["desc"] = line.strip()
-                    break
+            body = _trim_blank(block[1:])
+            module["doc"] = "\n".join(body)
+            module["desc"] = _first_paragraph(body)
             continue
 
-        m = re.match(r"^(\w+)[.:](\w+)", first)
+        m = _SIGNATURE_RE.match(first)
         if not m:
+            if first:
+                warn(lineno, f"skipping docstring with unrecognised signature: {first}")
             continue
+        if module["name"] and m.group(1) != module["name"]:
+            warn(lineno, f"{first}: expected prefix {module['name']!r}")
 
-        item_name = re.split(r"[(\s]", m.group(2))[0]
         body = block[1:]
-
-        item_type = "Method"
-        for line in body:
-            s = line.strip()
-            if s in _ITEM_TYPES:
-                item_type = s
-                break
-            if s:
-                break
+        head = _trim_blank(body)
+        if head and head[0].strip() in _ITEM_TYPES:
+            item_type = head[0].strip()
+            body = head[1:]
+        else:
+            item_type = _infer_type(first)
+            warn(lineno, f"{first}: no type line, assuming {item_type}")
 
         sections = parse_sections(body)
-
         module["items"].append(
             {
-                "name": item_name,
+                "name": m.group(3),
                 "type": item_type,
                 "signature": first,
-                "desc": sections["desc"],
-                "doc": "\n".join(body).strip(),
-                "parameters": sections["parameters"],
-                "returns": sections["returns"],
-                "notes": sections["notes"],
+                "doc": "\n".join(_trim_blank(body)),
+                **sections,
             }
         )
 
@@ -156,6 +208,7 @@ def parse_module(blocks: list[list[str]]) -> dict:
 
 
 def to_json(module: dict) -> str:
+    """Serialise in the shape Hammerspoon's hs.doc reads from a Spoon's docs.json."""
     payload = [
         {
             "name": module["name"],
@@ -171,9 +224,11 @@ def to_json(module: dict) -> str:
                     "def": item["signature"],
                     "desc": item["desc"],
                     "doc": item["doc"],
+                    "stripped_doc": item["stripped_doc"],
                     "parameters": item["parameters"],
                     "returns": item["returns"],
                     "notes": item["notes"],
+                    "examples": item["examples"],
                 }
                 for item in module["items"]
             ],
@@ -182,74 +237,195 @@ def to_json(module: dict) -> str:
     return json.dumps(payload, indent=2)
 
 
-_HTML = """\
+# ---------------------------------------------------------------------------
+# HTML rendering
+# ---------------------------------------------------------------------------
+
+_md = MarkdownIt("commonmark", {"linkify": True}).enable("linkify")
+
+
+def _markdown(lines: list[str] | str) -> Markup:
+    text = lines if isinstance(lines, str) else "\n".join(lines)
+    return Markup(_md.render(textwrap.dedent(text)))
+
+
+def _parameters_markdown(lines: list[str]) -> Markup:
+    """Render a Parameters section, setting each top-level name in code."""
+    text = textwrap.dedent("\n".join(lines))
+    text = re.sub(r"^([*-] )(\w+)( - )", r"\1`\2`\3", text, flags=re.MULTILINE)
+    return _markdown(text)
+
+
+_SIG_PARTS_RE = re.compile(
+    r"^(?P<obj>\w+)(?P<sep>[.:])(?P<name>\w+)"
+    r"(?P<args>\(.*?\))?"
+    r"(?:\s*->\s*(?P<ret>.+))?$"
+)
+
+
+def _signature_html(signature: str) -> Markup:
+    m = _SIG_PARTS_RE.match(signature)
+    if not m:
+        return escape(signature)
+    out = (
+        Markup('<span class="sig-obj">{}{}</span><span class="sig-name">{}</span>')
+    ).format(m["obj"], m["sep"], m["name"])
+    if m["args"]:
+        out += Markup('<span class="sig-args">{}</span>').format(m["args"])
+    if m["ret"]:
+        out += Markup(
+            ' <span class="sig-arrow">&rarr;</span> <span class="sig-ret">{}</span>'
+        ).format(m["ret"])
+    return out
+
+
+_TEMPLATE = """\
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{name} — Hammerspoon Spoon</title>
+<title>{{ name }} — Hammerspoon Spoon</title>
+<meta name="description" content="{{ desc }}">
 <style>
-  :root {{
-    --fg: #1a1a1a; --bg: #fff; --accent: #2563eb;
-    --border: #e5e7eb; --muted-bg: #f3f4f6; --code-bg: #f8f8f8;
-  }}
-  @media (prefers-color-scheme: dark) {{
-    :root {{ --fg: #e5e7eb; --bg: #111; --accent: #60a5fa;
-             --border: #374151; --muted-bg: #1f2937; --code-bg: #1a1a1a; }}
-  }}
-  * {{ box-sizing: border-box; }}
-  body {{ font: 16px/1.6 system-ui, sans-serif; color: var(--fg); background: var(--bg);
-          max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }}
-  h1 {{ font-size: 1.8rem; margin-bottom: .25rem; }}
-  .subtitle {{ color: #6b7280; margin-top: 0; }}
-  nav {{ margin: 1.5rem 0; display: flex; gap: 1rem; flex-wrap: wrap; }}
-  nav a {{ color: var(--accent); text-decoration: none; }}
-  nav a:hover {{ text-decoration: underline; }}
-  hr {{ border: none; border-top: 1px solid var(--border); margin: 2rem 0; }}
-  h2 {{ font-size: 1.1rem; font-weight: 600; text-transform: uppercase;
-        letter-spacing: .06em; color: #6b7280; margin: 2.5rem 0 .75rem; }}
-  .item {{ border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1.25rem; overflow: hidden; }}
-  .item-header {{ display: flex; align-items: baseline; gap: .75rem;
-                  padding: .6rem 1rem; background: var(--muted-bg);
-                  border-bottom: 1px solid var(--border); }}
-  .item-name {{ font-weight: 600; font-size: 1rem; }}
-  .item-body {{ padding: .75rem 1rem; }}
-  .sig {{ font-family: monospace; font-size: .875rem; background: var(--code-bg);
-          border: 1px solid var(--border); border-radius: 4px;
-          padding: .4rem .75rem; margin: .25rem 0 .75rem; white-space: pre-wrap; overflow-wrap: break-word; }}
-  .section-label {{ font-weight: 600; font-size: .85rem; margin: .75rem 0 .2rem; }}
-  ul.params {{ margin: .25rem 0 0; padding-left: 1.25rem; }}
-  ul.params li {{ margin: .15rem 0; font-size: .95rem; }}
-  footer {{ margin-top: 3rem; font-size: .85rem; color: #6b7280; text-align: center; }}
-  footer a {{ color: var(--accent); }}
+  :root {
+    --fg: #1a1a1a; --muted: #6b7280; --bg: #fff; --accent: #2563eb;
+    --border: #e5e7eb; --muted-bg: #f3f4f6; --code-bg: #f6f7f9;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e5e7eb; --muted: #9ca3af; --bg: #111; --accent: #60a5fa;
+            --border: #374151; --muted-bg: #1f2937; --code-bg: #1a1d23; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 1rem; }
+  body { font: 16px/1.6 system-ui, sans-serif; color: var(--fg); background: var(--bg);
+         max-width: 1120px; margin: 0 auto; padding: 2rem 1rem; }
+  a { color: var(--accent); overflow-wrap: anywhere; }
+  code { font-family: var(--mono); font-size: .875em; background: var(--code-bg);
+         border: 1px solid var(--border); border-radius: 4px; padding: .05em .3em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+        padding: .75rem 1rem; overflow-x: auto; }
+  pre code { background: none; border: 0; padding: 0; }
+  header { margin-bottom: 2rem; }
+  h1 { font-size: 1.9rem; margin: 0 0 .25rem; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .version { font-size: .85rem; font-weight: 500; color: var(--muted);
+             border: 1px solid var(--border); border-radius: 999px; padding: 0 .55rem; }
+  .subtitle { font-size: 1.1rem; margin: 0 0 1rem; }
+  .links { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0; }
+  .links a { text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  .layout { display: grid; gap: 2rem; }
+  .toc { border: 1px solid var(--border); border-radius: 6px; padding: .75rem 1rem;
+         font-size: .9rem; align-self: start; }
+  .toc h2 { font-size: .75rem; margin: .75rem 0 .25rem; }
+  .toc h2:first-child { margin-top: 0; }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: .1rem 0; }
+  .toc a { text-decoration: none; font-family: var(--mono); font-size: .85rem;
+           overflow-wrap: anywhere; }
+  .toc a:hover { text-decoration: underline; }
+  @media (min-width: 900px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .toc { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+  }
+  h2 { font-size: .85rem; font-weight: 600; text-transform: uppercase;
+       letter-spacing: .06em; color: var(--muted); }
+  main > h2 { margin: 2.5rem 0 .75rem; }
+  main > h2:first-child { margin-top: 0; }
+  .overview { margin-bottom: 1rem; }
+  .overview > :first-child { margin-top: 0; }
+  .item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1.25rem; }
+  .item:target { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .item-header { display: flex; align-items: baseline; gap: .75rem;
+                 padding: .6rem 1rem; background: var(--muted-bg);
+                 border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
+  .sig { font-family: var(--mono); font-size: .9rem; flex: 1; min-width: 0;
+         overflow-wrap: anywhere; background: none; border: 0; padding: 0; }
+  .sig-obj, .sig-arrow { color: var(--muted); }
+  .sig-name { font-weight: 700; }
+  .sig-ret { color: var(--accent); }
+  .badge { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+           color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
+           padding: 0 .4rem; white-space: nowrap; }
+  .anchor { color: var(--muted); text-decoration: none; font-weight: 600; }
+  .anchor:hover { color: var(--accent); }
+  .item-body { padding: .75rem 1rem; }
+  .item-body > :first-child { margin-top: 0; }
+  .item-body > :last-child { margin-bottom: 0; }
+  .item-body ul { padding-left: 1.25rem; }
+  .item-body li { margin: .15rem 0; }
+  .item-body li > ul { margin: .15rem 0; }
+  .section-label { font-weight: 600; font-size: .85rem; margin: .9rem 0 .2rem; }
+  .section-label + ul, .section-label + p { margin-top: 0; }
+  footer { margin-top: 3rem; font-size: .85rem; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
-<h1>{name}</h1>
-<p class="subtitle">{version_line}{desc}</p>
-<nav>
-  <a href="{repo_url}">GitHub</a>
-  <a href="{repo_url}/releases/latest">Latest release</a>
+<header id="top">
+  <h1>{{ name }}{% if version %} <span class="version">v{{ version }}</span>{% endif %}</h1>
+  {% if desc_html %}<p class="subtitle">{{ desc_html }}</p>{% endif %}
+  {% if repo_url %}
+  <p class="links">
+    <a href="{{ repo_url }}">GitHub</a>
+    <a href="{{ repo_url }}/releases/latest">Latest release</a>
+  </p>
+  {% endif %}
+</header>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  {% if overview %}<h2><a href="#overview">Overview</a></h2>{% endif %}
+  {% for group in groups %}
+  <h2>{{ group.title }}</h2>
+  <ul>
+    {% for item in group["items"] %}
+    <li><a href="#{{ item.anchor }}" title="{{ item.desc | replace("`", "") }}">{{ item.name }}</a></li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
 </nav>
-<hr>
-{body}
+<main>
+{% if overview %}
+<h2 id="overview">Overview</h2>
+<div class="overview">{{ overview }}</div>
+{% endif %}
+{% for group in groups %}
+<h2>{{ group.title }}</h2>
+{% for item in group["items"] %}
+<section class="item" id="{{ item.anchor }}">
+  <div class="item-header">
+    <code class="sig">{{ item.sig_html }}</code>
+    <span class="badge">{{ item.type }}</span>
+    <a class="anchor" href="#{{ item.anchor }}" aria-label="Link to {{ item.name }}">#</a>
+  </div>
+  <div class="item-body">
+    {{ item.desc_html }}
+    {% for label, html in item.sections %}
+    <p class="section-label">{{ label }}</p>
+    {{ html }}
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endfor %}
+</main>
+</div>
 <footer>
-  Generated {today} &mdash; <a href="{repo_url}">{repo_url}</a>
+  Generated {{ today }}{% if repo_url %} &mdash; <a href="{{ repo_url }}">{{ repo_url }}</a>{% endif %}
 </footer>
 </body>
 </html>
 """
 
+_env = Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
 
-def _list_html(label: str, items: list[str]) -> str:
-    if not items:
-        return ""
-    lis = "\n".join(f"      <li>{h(item)}</li>" for item in items)
-    return (
-        f'    <p class="section-label">{label}</p>\n'
-        f'    <ul class="params">\n{lis}\n    </ul>\n'
-    )
+
+def _overview_lines(doc: str) -> list[str]:
+    """The module doc minus its first paragraph (shown as the subtitle)."""
+    lines = _trim_blank(doc.splitlines())
+    while lines and lines[0].strip():
+        lines.pop(0)
+    return _trim_blank(lines)
 
 
 def to_html(module: dict, repo_url: str) -> str:
@@ -257,41 +433,50 @@ def to_html(module: dict, repo_url: str) -> str:
     for item in module["items"]:
         by_type.setdefault(item["type"], []).append(item)
 
-    sections: list[str] = []
-    for type_name in ("Variable", "Field", "Method", "Function", "Constructor"):
-        group = by_type.get(type_name)
-        if not group:
-            continue
-        sections.append(f"<h2>{type_name}s</h2>")
-        for item in group:
-            params = _list_html("Parameters", item["parameters"])
-            returns = _list_html("Returns", item["returns"])
-            sections.append(
-                f'<div class="item" id="{h(item["name"])}">\n'
-                f'  <div class="item-header">'
-                f'<span class="item-name">{h(item["name"])}</span>'
-                f"</div>\n"
-                f'  <div class="item-body">\n'
-                f'    <div class="sig">{h(item["signature"])}</div>\n'
-                f"    <p>{h(item['desc'])}</p>\n"
-                f"{params}"
-                f"{returns}"
-                f"  </div>\n"
-                f"</div>"
+    anchors: set[str] = set()
+    groups = []
+    for type_name in _ITEM_TYPES:
+        items = []
+        for item in by_type.get(type_name, []):
+            anchor = item["name"]
+            if anchor in anchors:
+                anchor = f"{item['name']}-{type_name.lower()}"
+            anchors.add(anchor)
+            items.append(
+                {
+                    "name": item["name"],
+                    "type": item["type"],
+                    "anchor": anchor,
+                    "desc": item["desc"],
+                    "sig_html": _signature_html(item["signature"]),
+                    "desc_html": _markdown(item["stripped_doc"]),
+                    "sections": [
+                        (label, render(item[key]))
+                        for label, key, render in (
+                            ("Parameters", "parameters", _parameters_markdown),
+                            ("Returns", "returns", _markdown),
+                            ("Notes", "notes", _markdown),
+                            ("Examples", "examples", _markdown),
+                        )
+                        if item[key]
+                    ],
+                }
             )
+        if items:
+            groups.append({"title": f"{type_name}s", "items": items})
 
-    version_line = (
-        f'<span style="font-size:.85em;color:#6b7280">v{h(module["version"])} &mdash; </span>'
-        if module["version"]
-        else ""
-    )
-    return _HTML.format(
-        name=h(module["name"]),
-        version_line=version_line,
-        desc=h(module["desc"]),
+    version = module["version"]
+    overview = _overview_lines(module["doc"])
+    return _env.from_string(_TEMPLATE).render(
+        name=module["name"],
+        # Unstamped local builds carry a placeholder like "dev"; don't show it.
+        version=version if version[:1].isdigit() else "",
+        desc=module["desc"],
+        desc_html=Markup(_md.renderInline(module["desc"])),
+        overview=_markdown(overview) if overview else "",
+        groups=groups,
         repo_url=repo_url,
         today=datetime.now(tz=UTC).date().isoformat(),
-        body="\n".join(sections),
     )
 
 
@@ -305,6 +490,9 @@ def main() -> None:
     blocks = extract_blocks(source)
     module = parse_module(blocks)
     module["version"] = extract_version(source)
+
+    for lineno, msg in module["warnings"]:
+        print(f"{lua_file.name}:{lineno}: warning: {msg}", file=sys.stderr)
 
     if not module["name"]:
         print(

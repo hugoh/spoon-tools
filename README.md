@@ -8,8 +8,13 @@ Shared tooling for [Hammerspoon](https://www.hammerspoon.org/) Spoon repositorie
 
 Parses Hammerspoon-style `---` docstrings from `init.lua` and writes:
 
-- `docs/docs.json` — structured JSON used by the release workflow
+- `docs/docs.json` — the Hammerspoon `hs.doc` format, shipped inside the Spoon zip
 - `docs/index.html` — a standalone rendered doc page deployed to GitHub Pages
+
+Docstrings are Markdown (CommonMark; bare URLs are linked). Section bullets
+under `Parameters:`, `Returns:`, `Notes:` and `Examples:` may wrap and nest.
+The page has a table of contents and a permalink on every item. Malformed
+blocks (unrecognised signature, missing type line) are reported as warnings.
 
 It reads `obj.version` from `init.lua` and auto-detects the repo URL from `git remote get-url origin`.
 
