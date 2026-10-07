@@ -107,13 +107,6 @@ def _first_paragraph(lines: list[str]) -> str:
     return " ".join(para)
 
 
-def _infer_type(signature: str) -> str:
-    m = _SIGNATURE_RE.match(signature)
-    if m and m.group(2) == ":":
-        return "Method"
-    return "Function" if "(" in signature else "Variable"
-
-
 def parse_sections(body: list[str]) -> dict:
     """Split an item body (after the type line) into description and sections.
 
@@ -184,14 +177,12 @@ def parse_module(blocks: list[tuple[int, list[str]]]) -> dict:
         if module["name"] and m.group(1) != module["name"]:
             warn(lineno, f"{first}: expected prefix {module['name']!r}")
 
-        body = block[1:]
-        head = _trim_blank(body)
-        if head and head[0].strip() in _ITEM_TYPES:
-            item_type = head[0].strip()
-            body = head[1:]
-        else:
-            item_type = _infer_type(first)
-            warn(lineno, f"{first}: no type line, assuming {item_type}")
+        head = _trim_blank(block[1:])
+        if not head or head[0].strip() not in _ITEM_TYPES:
+            warn(lineno, f"{first}: no type line, skipping")
+            continue
+        item_type = head[0].strip()
+        body = head[1:]
 
         sections = parse_sections(body)
         module["items"].append(
@@ -211,27 +202,9 @@ def to_json(module: dict) -> str:
     """Serialise in the shape Hammerspoon's hs.doc reads from a Spoon's docs.json."""
     payload = [
         {
-            "name": module["name"],
-            "version": module["version"],
+            **{key: module[key] for key in ("name", "version", "desc", "doc")},
             "type": "Module",
-            "desc": module["desc"],
-            "doc": module["doc"],
-            "items": [
-                {
-                    "name": item["name"],
-                    "type": item["type"],
-                    "signature": item["signature"],
-                    "def": item["signature"],
-                    "desc": item["desc"],
-                    "doc": item["doc"],
-                    "stripped_doc": item["stripped_doc"],
-                    "parameters": item["parameters"],
-                    "returns": item["returns"],
-                    "notes": item["notes"],
-                    "examples": item["examples"],
-                }
-                for item in module["items"]
-            ],
+            "items": [{**item, "def": item["signature"]} for item in module["items"]],
         }
     ]
     return json.dumps(payload, indent=2)
@@ -451,13 +424,15 @@ def to_html(module: dict, repo_url: str) -> str:
                     "sig_html": _signature_html(item["signature"]),
                     "desc_html": _markdown(item["stripped_doc"]),
                     "sections": [
-                        (label, render(item[key]))
-                        for label, key, render in (
-                            ("Parameters", "parameters", _parameters_markdown),
-                            ("Returns", "returns", _markdown),
-                            ("Notes", "notes", _markdown),
-                            ("Examples", "examples", _markdown),
+                        (
+                            key.capitalize(),
+                            (
+                                _parameters_markdown
+                                if key == "parameters"
+                                else _markdown
+                            )(item[key]),
                         )
+                        for key in _SECTIONS.values()
                         if item[key]
                     ],
                 }
