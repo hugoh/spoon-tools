@@ -126,7 +126,7 @@ def test_module_desc_is_full_first_paragraph() -> None:
 
 def test_rules_and_annotations_are_not_docstrings() -> None:
     names = [i["name"] for i in _module()["items"]]
-    assert names == ["delay", "bind", "untyped"]
+    assert names == ["delay", "bind"]
 
 
 def test_sections_keep_wrapped_and_nested_lines() -> None:
@@ -147,7 +147,7 @@ def test_sections_keep_wrapped_and_nested_lines() -> None:
 
 def test_warnings_for_missing_type_and_bad_signature() -> None:
     module = _module()
-    assert _item(module, "untyped")["type"] == "Method"
+    assert all(item["name"] != "untyped" for item in module["items"])
     messages = [msg for _, msg in module["warnings"]]
     assert any("no type line" in m for m in messages)
     assert any("unrecognised signature" in m for m in messages)
