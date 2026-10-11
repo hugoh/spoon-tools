@@ -19,8 +19,27 @@ zizmor = "1.30.1"
 "github:tj-actions/auto-doc" = "3.6.0"
 
 [tasks.test]
-run = ["uv run --group dev pytest", "busted"]
-description = "Run the Python and Lua test suites"
+depends = ["test:*"]
+description = "Run all test suites"
+
+[tasks."test:py"]
+run = "uv run --group dev pytest"
+description = "Run the Python test suite"
+
+[tasks."test:lua"]
+run = "busted"
+description = "Run the hs_mock busted specs"
+
+[tasks."test:rock"]
+description = "Build the hs-mock rock into a scratch tree and require it from there only"
+run = """
+set -e
+tree="$(mktemp -d)"
+trap 'rm -rf "$tree"' EXIT
+luarocks make --tree "$tree" hs-mock-scm-1.rockspec >/dev/null
+lua -e "package.path = '$tree/share/lua/5.4/?.lua'; require('hs_mock').new()"
+echo "hs-mock rock OK"
+"""
 
 [tasks.vendor-fnutils]
 description = "Refresh the vendored hs.fnutils from a Hammerspoon release tag"
