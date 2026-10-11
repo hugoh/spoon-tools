@@ -50,6 +50,62 @@ Watcher.__index = Watcher
 local Hotkey = {}
 Hotkey.__index = Hotkey
 
+local AudioDevice = {}
+AudioDevice.__index = AudioDevice
+
+function AudioDevice:name() return self._name end
+
+function AudioDevice:uid() return self._uid end
+
+function AudioDevice:transportType() return self._transport end
+
+function AudioDevice:muted() return self._muted end
+
+function AudioDevice:volume() return self._volume end
+
+function AudioDevice:inUse() return self._inUse end
+
+function AudioDevice:isOutputDevice() return not self._input end
+
+function AudioDevice:isInputDevice() return self._input end
+
+function AudioDevice:setMuted(muted)
+	self._muted = muted
+	return true
+end
+
+function AudioDevice:setVolume(volume)
+	self._volume = volume
+	return true
+end
+
+function AudioDevice:setDefaultOutputDevice()
+	self._ctl.audio.defaultOutput = self
+	return true
+end
+
+function AudioDevice:setDefaultInputDevice()
+	self._ctl.audio.defaultInput = self
+	return true
+end
+
+function AudioDevice:watcherCallback(fn)
+	self._watchCb = fn
+	return self
+end
+
+function AudioDevice:watcherStart()
+	self._watching = true
+	return self
+end
+
+function AudioDevice:watcherStop()
+	self._watching = false
+	return self
+end
+
+function AudioDevice:watcherIsRunning() return self._watching end
+
 function Watcher:start()
 	self._running = true
 	return self
@@ -156,8 +212,11 @@ function M.new()
 		dirs = {},
 		caffeinateWatchers = {},
 		appWatchers = {},
+		images = {},
+		audio = { outputs = {}, inputs = {}, defaultOutput = nil, defaultInput = nil },
 		onTask = nil,
 	}
+	local audioWatcher = { running = false }
 	local timers = {}
 	local seq = 0
 
@@ -266,6 +325,30 @@ function M.new()
 		for _, w in ipairs(ctl.caffeinateWatchers) do
 			if w._running then w._fn(event) end
 		end
+	end
+
+	function ctl.addAudioDevice(attributes)
+		local device = setmetatable({
+			_name = attributes.name,
+			_uid = attributes.uid or attributes.name,
+			_input = attributes.input == true,
+			_transport = attributes.transport,
+			_muted = attributes.muted == true,
+			_volume = attributes.volume,
+			_inUse = attributes.inUse == true,
+			_watching = false,
+			_ctl = ctl,
+		}, AudioDevice)
+		table.insert(device._input and ctl.audio.inputs or ctl.audio.outputs, device)
+		return device
+	end
+
+	function ctl.audioEvent(event)
+		if audioWatcher.running and audioWatcher.callback then audioWatcher.callback(event) end
+	end
+
+	function ctl.deviceEvent(device, event, scope, element)
+		if device._watching and device._watchCb then device._watchCb(device:uid(), event, scope, element) end
 	end
 
 	function ctl.appEvent(name, event, app)
@@ -393,6 +476,24 @@ function M.new()
 				deactivated = 6,
 				new = newWatcher(ctl.appWatchers),
 			}),
+		}),
+
+		audiodevice = strict("hs.audiodevice", {
+			allOutputDevices = function() return { table.unpack(ctl.audio.outputs) } end,
+			allInputDevices = function() return { table.unpack(ctl.audio.inputs) } end,
+			defaultOutputDevice = function() return ctl.audio.defaultOutput end,
+			defaultInputDevice = function() return ctl.audio.defaultInput end,
+			watcher = strict("hs.audiodevice.watcher", {
+				setCallback = function(fn) audioWatcher.callback = fn end,
+				start = function() audioWatcher.running = true end,
+				stop = function() audioWatcher.running = false end,
+				isRunning = function() return audioWatcher.running end,
+			}),
+		}),
+
+		image = strict("hs.image", {
+			imageFromName = function(name) return ctl.images[name] end,
+			iconForFile = function(path) return ctl.images[path] end,
 		}),
 
 		hotkey = strict("hs.hotkey", {
