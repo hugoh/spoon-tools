@@ -633,7 +633,19 @@ function M.new()
 		ipc = {},
 
 		alert = strict("hs.alert", {
-			show = function(text, style, screen, seconds)
+			-- Like Hammerspoon, the optional arguments are told apart by type.
+			show = function(text, ...)
+				local style, screen, seconds
+				for i = 1, select("#", ...) do
+					local arg = select(i, ...)
+					if type(arg) == "number" then
+						seconds = arg
+					elseif type(arg) == "table" and type(arg.frame) == "function" then
+						screen = arg
+					elseif type(arg) == "table" then
+						style = arg
+					end
+				end
 				alertCount = alertCount + 1
 				local id = "hs_mock-alert-" .. alertCount
 				table.insert(
