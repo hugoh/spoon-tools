@@ -70,6 +70,21 @@ describe("hs.logger", function()
 		assert.same({ "a 1 nil" }, ctl.logged("info"))
 	end)
 
+	it("exposes level as a readable and assignable number, like Hammerspoon", function()
+		local log = hs.logger.new("Spoon", "info")
+		assert.equal(3, log.level)
+		log.level = "debug"
+		assert.equal(4, log.level)
+		assert.equal(4, log.getLogLevel())
+	end)
+
+	it("aliases log and logf to i and f", function()
+		local log = hs.logger.new("Spoon")
+		log.log("a", "b")
+		log.logf("n=%d", 1)
+		assert.same({ "a b", "n=1" }, ctl.logged("info"))
+	end)
+
 	it("tracks the log level as a number, like Hammerspoon", function()
 		local log = hs.logger.new("Spoon", "info")
 		assert.equal(3, log.getLogLevel())
