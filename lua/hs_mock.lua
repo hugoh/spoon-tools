@@ -53,6 +53,55 @@ Hotkey.__index = Hotkey
 local AudioDevice = {}
 AudioDevice.__index = AudioDevice
 
+local Event = {}
+Event.__index = Event
+
+function Event:getType() return self._type end
+
+function Event:systemKey() return self._systemKey or {} end
+
+function Event:getFlags() return self._flags end
+
+function Event:setFlags(flags)
+	self._flags = flags
+	return self
+end
+
+function Event:post()
+	table.insert(self._ctl.posted, self)
+	return self
+end
+
+local Tap = {}
+Tap.__index = Tap
+
+function Tap:start()
+	self._enabled = true
+	return self
+end
+
+function Tap:stop()
+	self._enabled = false
+	return self
+end
+
+function Tap:isEnabled() return self._enabled end
+
+local Websocket = {}
+Websocket.__index = Websocket
+
+function Websocket:send(message)
+	table.insert(self._sent, message)
+	return self
+end
+
+function Websocket:close()
+	self._closed = true
+	return self
+end
+
+function Websocket:status() return self._closed and "closed" or "open" end
+
 function AudioDevice:name() return self._name end
 
 function AudioDevice:uid() return self._uid end
@@ -213,6 +262,24 @@ function M.new()
 		caffeinateWatchers = {},
 		appWatchers = {},
 		images = {},
+		executed = {},
+		opened = {},
+		alerts = {},
+		settings = {},
+		screenFrame = { x = 0, y = 0, w = 1440, h = 900 },
+		mousePosition = { x = 0, y = 0 },
+		keyStrokes = {},
+		clicks = {},
+		posted = {},
+		taps = {},
+		websockets = {},
+		wifiWatchers = {},
+		notificationWatchers = {},
+		launched = {},
+		wifiNetwork = nil,
+		interfaceStyle = nil,
+		frontmost = nil,
+		onExecute = nil,
 		audio = { outputs = {}, inputs = {}, defaultOutput = nil, defaultInput = nil },
 		onTask = nil,
 	}
@@ -351,6 +418,53 @@ function M.new()
 		if device._watching and device._watchCb then device._watchCb(device:uid(), event, scope, element) end
 	end
 
+	function ctl.newEvent(attributes)
+		return setmetatable({
+			_type = attributes.type,
+			_systemKey = attributes.systemKey,
+			_flags = attributes.flags or {},
+			_ctl = ctl,
+		}, Event)
+	end
+
+	function ctl.tapEvent(event)
+		for _, tap in ipairs(ctl.taps) do
+			if tap._enabled then
+				for _, t in ipairs(tap._types) do
+					if t == event:getType() then return tap._fn(event) end
+				end
+			end
+		end
+	end
+
+	function ctl.websocketEvent(ws, event, message) return ws._callback(event, message) end
+
+	function ctl.wifiEvent(message, interface)
+		for _, w in ipairs(ctl.wifiWatchers) do
+			if w._running then w._fn(w, message or "SSIDChange", interface or "en0") end
+		end
+	end
+
+	function ctl.distributedNotification(name, object, userInfo)
+		for _, w in ipairs(ctl.notificationWatchers) do
+			if w._running and (w._name == nil or w._name == name) then w._fn(name, object, userInfo) end
+		end
+	end
+
+	local function findApp(hint)
+		if ctl.apps[hint] then return ctl.apps[hint] end
+		local candidates = {}
+		for _, app in pairs(ctl.apps) do
+			table.insert(candidates, app)
+		end
+		table.insert(candidates, ctl.frontmost)
+		for _, app in ipairs(candidates) do
+			if type(app) == "table" and app.bundleID and app:bundleID() == hint then return app end
+		end
+	end
+
+	local alertCount = 0
+
 	function ctl.appEvent(name, event, app)
 		for _, w in ipairs(ctl.appWatchers) do
 			if w._running then w._fn(name, event, app) end
@@ -464,8 +578,17 @@ function M.new()
 		}),
 
 		application = strict("hs.application", {
-			find = function(hint) return ctl.apps[hint] end,
-			get = function(hint) return ctl.apps[hint] end,
+			find = findApp,
+			get = findApp,
+			frontmostApplication = function() return ctl.frontmost end,
+			launchOrFocus = function(name)
+				table.insert(ctl.launched, name)
+				return true
+			end,
+			launchOrFocusByBundleID = function(bundleID)
+				table.insert(ctl.launched, bundleID)
+				return true
+			end,
 			watcher = strict("hs.application.watcher", {
 				launching = 0,
 				launched = 1,
@@ -494,6 +617,118 @@ function M.new()
 		image = strict("hs.image", {
 			imageFromName = function(name) return ctl.images[name] end,
 			iconForFile = function(path) return ctl.images[path] end,
+		}),
+
+		execute = function(command, withUserEnv)
+			table.insert(ctl.executed, command)
+			if ctl.onExecute then return ctl.onExecute(command, withUserEnv) end
+			return "", true, "exit", 0
+		end,
+
+		open = function(path)
+			table.insert(ctl.opened, path)
+			return true
+		end,
+
+		ipc = {},
+
+		alert = strict("hs.alert", {
+			show = function(text, style, screen, seconds)
+				alertCount = alertCount + 1
+				local id = "hs_mock-alert-" .. alertCount
+				table.insert(
+					ctl.alerts,
+					{ id = id, text = text, style = style, screen = screen, seconds = seconds, closed = false }
+				)
+				return id
+			end,
+			closeSpecific = function(id)
+				for _, a in ipairs(ctl.alerts) do
+					if a.id == id then a.closed = true end
+				end
+			end,
+			closeAll = function()
+				for _, a in ipairs(ctl.alerts) do
+					a.closed = true
+				end
+			end,
+		}),
+
+		settings = strict("hs.settings", {
+			get = function(key) return ctl.settings[key] end,
+			set = function(key, value) ctl.settings[key] = value end,
+			clear = function(key) ctl.settings[key] = nil end,
+		}),
+
+		screen = strict("hs.screen", {
+			mainScreen = function()
+				return { frame = function() return deepcopy(ctl.screenFrame) end }
+			end,
+		}),
+
+		mouse = strict("hs.mouse", {
+			absolutePosition = function(point)
+				if point == nil then return deepcopy(ctl.mousePosition) end
+				ctl.mousePosition = deepcopy(point)
+			end,
+		}),
+
+		eventtap = strict("hs.eventtap", {
+			keyStroke = function(mods, key, delay, app)
+				table.insert(ctl.keyStrokes, { mods = mods, key = key, delay = delay, app = app })
+			end,
+			leftClick = function(point) table.insert(ctl.clicks, point) end,
+			new = function(types, fn)
+				local tap = setmetatable({ _types = types, _fn = fn, _enabled = false }, Tap)
+				table.insert(ctl.taps, tap)
+				return tap
+			end,
+			event = strict("hs.eventtap.event", {
+				types = {
+					leftMouseDown = 1,
+					leftMouseUp = 2,
+					rightMouseDown = 3,
+					rightMouseUp = 4,
+					mouseMoved = 5,
+					keyDown = 10,
+					keyUp = 11,
+					flagsChanged = 12,
+					systemDefined = 14,
+					scrollWheel = 22,
+				},
+				newSystemKeyEvent = function(key, down)
+					return ctl.newEvent({ type = 14, systemKey = { key = key, down = down } })
+				end,
+			}),
+		}),
+
+		websocket = strict("hs.websocket", {
+			new = function(url, callback)
+				local ws = setmetatable({ _url = url, _callback = callback, _sent = {}, _closed = false }, Websocket)
+				table.insert(ctl.websockets, ws)
+				return ws
+			end,
+		}),
+
+		wifi = strict("hs.wifi", {
+			currentNetwork = function() return ctl.wifiNetwork end,
+			watcher = strict("hs.wifi.watcher", { new = newWatcher(ctl.wifiWatchers) }),
+		}),
+
+		host = strict("hs.host", {
+			interfaceStyle = function() return ctl.interfaceStyle end,
+		}),
+
+		distributednotifications = strict("hs.distributednotifications", {
+			new = function(fn, name, object)
+				local w = newWatcher(ctl.notificationWatchers)(fn)
+				w._name, w._object = name, object
+				return w
+			end,
+		}),
+
+		spoons = strict("hs.spoons", {
+			resourcePath = function(file) return file end,
 		}),
 
 		hotkey = strict("hs.hotkey", {

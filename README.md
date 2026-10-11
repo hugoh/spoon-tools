@@ -83,6 +83,11 @@ end)
 `absoluteTime`; `task.new`; `menubar.new`; `notify.new`, `activationTypes`;
 `caffeinate.watcher`; `application.find`, `get`, `watcher`; `hotkey.bind`;
 `audiodevice` (devices, defaults, `watcher`); `image.imageFromName`, `iconForFile`;
+`execute`; `open`; `ipc` (present); `alert`; `settings`; `screen.mainScreen`;
+`mouse.absolutePosition`; `eventtap` (`keyStroke`, `leftClick`, `new`, `event`);
+`websocket`; `wifi`; `host.interfaceStyle`; `distributednotifications`;
+`spoons.resourcePath` (returns the file unchanged); `application.launchOrFocus`,
+`launchOrFocusByBundleID`, `frontmostApplication`;
 `json.read`, `write`; `fs.attributes`, `mkdir`; `fnutils` (Hammerspoon's own
 code, vendored). Event constants match Hammerspoon 1.1.1.
 
@@ -100,15 +105,33 @@ code, vendored). Event constants match Hammerspoon 1.1.1.
 | `ctl.menubars` | Created menubars (`_title`, `_icon`, `_menu`, `_tooltip`, `_deleted`…); `bar:_click()` |
 | `ctl.notifications`, `ctl.activate(note, type)` | Created notifications (`_attributes`, `_sent`, `_withdrawn`); activation calls back |
 | `ctl.caffeinate(event)`, `ctl.appEvent(name, event, app)` | Delivers to started watchers |
-| `ctl.apps[name]` | What `application.find` / `get` return |
+| `ctl.apps[name]`, `ctl.frontmost` | `application.find` / `get` match a key of `ctl.apps`, else a `bundleID()` among those apps and the frontmost one; `frontmostApplication` returns `ctl.frontmost` |
+| `ctl.launched` | Names and bundle ids passed to `launchOrFocus` / `launchOrFocusByBundleID` |
 | `ctl.addAudioDevice{ name, uid, input, transport, muted, volume, inUse }` | Adds an output (or `input = true`) device; `uid` defaults to `name` |
 | `ctl.audio.defaultOutput`, `ctl.audio.defaultInput` | The default devices; `setDefault*Device()` updates them |
 | `ctl.audioEvent(event)`, `ctl.deviceEvent(device, event, scope, element)` | Fires the running `audiodevice.watcher`, or a watching device's callback |
+| `ctl.executed`, `ctl.onExecute = fn(cmd)` | Commands passed to `hs.execute`; `onExecute` returns its `output, status, type, rc` (default `"", true, "exit", 0`) |
+| `ctl.opened` | Paths passed to `hs.open` |
+| `ctl.alerts` | `{ id, text, style, screen, seconds, closed }` per `alert.show` (which returns the string `id`) |
+| `ctl.settings`, `ctl.screenFrame`, `ctl.mousePosition` | Backing state for `settings`, `screen.mainScreen():frame()` and `mouse.absolutePosition` |
+| `ctl.keyStrokes`, `ctl.clicks`, `ctl.posted` | `eventtap.keyStroke` / `leftClick` calls and posted events |
+| `ctl.newEvent{ type, systemKey, flags }`, `ctl.tapEvent(event)` | Builds an event; delivers it to the first enabled tap watching its type and returns that tap's answer |
+| `ctl.websockets`, `ctl.websocketEvent(ws, event, message)` | Created websockets (`_url`, `_sent`, `_closed`); calls a socket's callback |
+| `ctl.wifiNetwork`, `ctl.wifiEvent(message, interface)` | `wifi.currentNetwork`; notifies running wifi watchers (default `"SSIDChange"`, `"en0"`) |
+| `ctl.interfaceStyle` | `host.interfaceStyle`: `nil` (light) or `"Dark"`, as macOS reports |
+| `ctl.distributedNotification(name, object, userInfo)` | Delivers to running watchers registered for that name, or for all |
 | `ctl.images[nameOrPath]` | What `image.imageFromName` / `iconForFile` return; unknown names give `nil`, as in Hammerspoon |
 | `ctl.hotkeys` | Bindings: `mods`, `key`, `message`, `pressed`, `enabled`, `deleted` |
 | `ctl.files[path]`, `ctl.dirs[path]` | The filesystem behind `json` and `fs`; a non-table file value reads as malformed JSON |
 
-`json.read` and `json.write` copy, like real serialization. Releases follow
+`json.read` and `json.write` copy, like real serialization.
+
+**What stays local.** A spoon's tests keep their own fake, with a comment on why,
+when it is a test assertion rather than a mock (such as checking that a lookup is
+exact), when it is deliberately unrealistic (such as a `json.decode` that passes
+tables through), or when an honest shared version would need deep modelling
+(`axuielement` trees, `webview` with its JavaScript bridge, `canvas`). Anything
+generic goes here instead. Releases follow
 this repo's tags; refresh the vendored `fnutils` with `mise run vendor-fnutils <hammerspoon-tag>`.
 
 ---
