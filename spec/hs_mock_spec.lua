@@ -20,7 +20,7 @@ end)
 
 describe("strictness", function()
 	it("raises on an unmocked module", function()
-		assert.has_error(function() return hs.wifi end, "hs_mock: hs.wifi is not mocked")
+		assert.has_error(function() return hs.midi end, "hs_mock: hs.midi is not mocked")
 	end)
 
 	it("raises on an unmocked function in a mocked module", function()
@@ -28,9 +28,9 @@ describe("strictness", function()
 	end)
 
 	it("lets tests add their own modules and functions", function()
-		hs.wifi = { currentNetwork = function() return "home" end }
+		hs.midi = { devices = function() return "home" end }
 		hs.timer.doAt = function() return "custom" end
-		assert.equal("home", hs.wifi.currentNetwork())
+		assert.equal("home", hs.midi.devices())
 		assert.equal("custom", hs.timer.doAt())
 	end)
 
@@ -564,5 +564,188 @@ describe("hs.fnutils", function()
 		assert.same({ 2, 4 }, hs.fnutils.imap({ 1, 2 }, function(v) return v * 2 end))
 		assert.is_true(hs.fnutils.contains({ "a" }, "a"))
 		assert.same({ 1, 2, 3 }, hs.fnutils.partial(function(...) return { ... } end, 1)(2, 3))
+	end)
+end)
+
+describe("hs.execute and hs.open", function()
+	it("records commands and answers through ctl.onExecute", function()
+		assert.same({ "", true, "exit", 0 }, { hs.execute("true") })
+		ctl.onExecute = function(cmd) return cmd .. "!", false, "exit", 2 end
+		assert.same({ "ls!", false, "exit", 2 }, { hs.execute("ls", true) })
+		assert.same({ "true", "ls" }, ctl.executed)
+	end)
+
+	it("records opened paths", function()
+		assert.is_true(hs.open("/tmp/x"))
+		assert.same({ "/tmp/x" }, ctl.opened)
+	end)
+end)
+
+describe("hs.ipc", function()
+	it("is present by default, like a loadable Hammerspoon module", function() assert.is_table(hs.ipc) end)
+end)
+
+describe("hs.alert", function()
+	it("returns string ids and records text, style, and closing", function()
+		local id = hs.alert.show("Hi", { textSize = 20 }, "screen", 3)
+		assert.is_string(id)
+		assert.equal("Hi", ctl.alerts[1].text)
+		assert.same({ textSize = 20 }, ctl.alerts[1].style)
+		assert.equal(3, ctl.alerts[1].seconds)
+		hs.alert.closeSpecific(id)
+		assert.is_true(ctl.alerts[1].closed)
+		hs.alert.show("Again")
+		hs.alert.closeAll()
+		assert.is_true(ctl.alerts[2].closed)
+	end)
+end)
+
+describe("hs.settings", function()
+	it("stores values in ctl.settings", function()
+		hs.settings.set("k", 1)
+		assert.equal(1, hs.settings.get("k"))
+		assert.equal(1, ctl.settings.k)
+		hs.settings.clear("k")
+		assert.is_nil(hs.settings.get("k"))
+	end)
+end)
+
+describe("hs.screen and hs.mouse", function()
+	it("reports the main screen frame from ctl.screenFrame, as a copy", function()
+		local frame = hs.screen.mainScreen():frame()
+		assert.same({ x = 0, y = 0, w = 1440, h = 900 }, frame)
+		frame.w = 1
+		assert.equal(1440, ctl.screenFrame.w)
+	end)
+
+	it("gets and sets the mouse position", function()
+		assert.same({ x = 0, y = 0 }, hs.mouse.absolutePosition())
+		hs.mouse.absolutePosition({ x = 5, y = 6 })
+		assert.same({ x = 5, y = 6 }, ctl.mousePosition)
+	end)
+end)
+
+describe("hs.eventtap", function()
+	it("records keystrokes and clicks", function()
+		local app = {}
+		hs.eventtap.keyStroke({ "cmd" }, "m", 0, app)
+		hs.eventtap.leftClick({ x = 1, y = 2 })
+		assert.same({ { mods = { "cmd" }, key = "m", delay = 0, app = app } }, ctl.keyStrokes)
+		assert.same({ { x = 1, y = 2 } }, ctl.clicks)
+	end)
+
+	it("uses the real CoreGraphics event type values", function()
+		local types = hs.eventtap.event.types
+		assert.equal(10, types.keyDown)
+		assert.equal(11, types.keyUp)
+		assert.equal(12, types.flagsChanged)
+		assert.equal(14, types.systemDefined)
+	end)
+
+	it("builds and posts system key events", function()
+		local e = hs.eventtap.event.newSystemKeyEvent("SOUND_UP", true)
+		assert.equal(hs.eventtap.event.types.systemDefined, e:getType())
+		assert.same({ key = "SOUND_UP", down = true }, e:systemKey())
+		assert.equal(e, e:setFlags({ alt = true }))
+		assert.same({ alt = true }, e:getFlags())
+		assert.equal(e, e:post())
+		assert.same({ e }, ctl.posted)
+	end)
+
+	it("delivers events of matching types to enabled taps and returns their answer", function()
+		local seen = {}
+		local tap = hs.eventtap.new({ hs.eventtap.event.types.systemDefined }, function(e)
+			table.insert(seen, e)
+			return true
+		end)
+		local e =
+			ctl.newEvent({ type = hs.eventtap.event.types.systemDefined, systemKey = { key = "MUTE", down = true } })
+		assert.is_nil(ctl.tapEvent(e))
+		assert.equal(tap, tap:start())
+		assert.is_true(tap:isEnabled())
+		assert.is_true(ctl.tapEvent(e))
+		assert.is_nil(ctl.tapEvent(ctl.newEvent({ type = hs.eventtap.event.types.keyDown })))
+		tap:stop()
+		assert.is_false(tap:isEnabled())
+		assert.same({ e }, seen)
+	end)
+end)
+
+describe("hs.websocket", function()
+	it("records sends and delivers events from ctl", function()
+		local got = {}
+		local ws = hs.websocket.new("ws://x", function(event, message) table.insert(got, { event, message }) end)
+		assert.equal(ws, ctl.websockets[1])
+		assert.equal("ws://x", ws._url)
+		ws:send("hello")
+		assert.same({ "hello" }, ws._sent)
+		ctl.websocketEvent(ws, "received", "msg")
+		assert.same({ { "received", "msg" } }, got)
+		ws:close()
+		assert.is_true(ws._closed)
+		assert.equal("closed", ws:status())
+	end)
+end)
+
+describe("hs.wifi, hs.host and hs.distributednotifications", function()
+	it("reports the current network and notifies running wifi watchers", function()
+		ctl.wifiNetwork = "home"
+		assert.equal("home", hs.wifi.currentNetwork())
+		local got
+		local w = hs.wifi.watcher.new(function(...) got = { ... } end)
+		ctl.wifiEvent()
+		assert.is_nil(got)
+		w:start()
+		ctl.wifiEvent()
+		assert.same({ w, "SSIDChange", "en0" }, got)
+	end)
+
+	it("reports the interface style as macOS does: nil when light", function()
+		assert.is_nil(hs.host.interfaceStyle())
+		ctl.interfaceStyle = "Dark"
+		assert.equal("Dark", hs.host.interfaceStyle())
+	end)
+
+	it("delivers distributed notifications to running watchers matching the name", function()
+		local got = {}
+		hs.distributednotifications.new(function(name) table.insert(got, name) end, "a"):start()
+		hs.distributednotifications.new(function(name) table.insert(got, "any:" .. name) end):start()
+		ctl.distributedNotification("a")
+		ctl.distributedNotification("b", "obj", {})
+		assert.same({ "a", "any:a", "any:b" }, got)
+	end)
+end)
+
+describe("hs.spoons", function()
+	it(
+		"returns the resource path unchanged",
+		function() assert.equal("icon.png", hs.spoons.resourcePath("icon.png")) end
+	)
+end)
+
+describe("hs.application launching and lookup", function()
+	it("records launches by name and bundle id", function()
+		assert.is_true(hs.application.launchOrFocus("Slack"))
+		assert.is_true(hs.application.launchOrFocusByBundleID("com.tinyspeck.slackmacgap"))
+		assert.same({ "Slack", "com.tinyspeck.slackmacgap" }, ctl.launched)
+	end)
+
+	it("reports the frontmost app from ctl.frontmost", function()
+		local app = {}
+		ctl.frontmost = app
+		assert.equal(app, hs.application.frontmostApplication())
+	end)
+
+	it("finds apps by key, then by bundle id among ctl.apps and the frontmost app", function()
+		local function app(bid)
+			return { bundleID = function() return bid end }
+		end
+		local teams, notes = app("com.microsoft.teams2"), app("com.apple.Notes")
+		ctl.apps.Teams = teams
+		ctl.frontmost = notes
+		assert.equal(teams, hs.application.get("Teams"))
+		assert.equal(teams, hs.application.get("com.microsoft.teams2"))
+		assert.equal(notes, hs.application.find("com.apple.Notes"))
+		assert.is_nil(hs.application.get("com.example.none"))
 	end)
 end)
