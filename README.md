@@ -39,8 +39,13 @@ rockspec pinned to its tag:
 
 ```toml
 # mise.toml
+[env]
+HS_MOCK_VERSION = "1.6.1" # bumped by the Renovate preset below
+
 [tasks.deps]
-run = "luarocks install --tree .rocks https://github.com/hugoh/spoon-tools/releases/download/v1.6.0/hs-mock-1.6.0-1.rockspec"
+run = "luarocks install --tree .rocks https://github.com/hugoh/spoon-tools/releases/download/v$HS_MOCK_VERSION/hs-mock-$HS_MOCK_VERSION-1.rockspec"
+sources = ["mise.toml"]
+outputs = [".rocks/lib/luarocks/rocks-5.4/hs-mock/*/rock_manifest"] # skip once installed
 
 [tasks.test]
 depends = ["deps"]
