@@ -499,7 +499,17 @@ function M.new()
 				for formatted, name in pairs({ ef = "error", wf = "warning", f = "info", df = "debug", vf = "verbose" }) do
 					log[formatted] = function(fmt, ...) record(id, name, fmt:format(...)) end
 				end
-				return log
+				log.log, log.logf = log.i, log.f
+				return setmetatable(log, {
+					__index = function(t, k)
+						if k == "level" then return current end
+						return rawget(t, k)
+					end,
+					__newindex = function(t, k, v)
+						if k == "level" then return log.setLogLevel(v) end
+						rawset(t, k, v)
+					end,
+				})
 			end,
 		}),
 
