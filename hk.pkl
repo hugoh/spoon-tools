@@ -4,12 +4,13 @@ import "package://github.com/hugoh/hk-config/releases/download/v2.1.3/hk-config@
 
 min_hk_version = Base.min_hk_version
 
+// Vendored upstream files stay byte-identical to Hammerspoon's for easy refresh.
+exclude = List("lua/hs_mock/fnutils.lua", "lua/hs_mock/inspect.lua")
+
 local linters = new Mapping<String, Step> {
     ...Base.base
     ...Base.python
-    // Vendored upstream file stays byte-identical to Hammerspoon's for easy refresh.
-    ["selene"] = (Builtins.selene) { exclude = "lua/hs_mock/fnutils.lua" }
-    ["stylua"] = (Builtins.stylua) { exclude = "lua/hs_mock/fnutils.lua" }
+    ...Base.lua
     ["readme-gen"] = {
         glob = List(
             ".github/workflows/spoon-release.yml",
