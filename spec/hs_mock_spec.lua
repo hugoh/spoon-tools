@@ -77,6 +77,13 @@ describe("hs.timer clock", function()
 		ctl.advance(2.5)
 		assert.equal(102.5, hs.timer.secondsSinceEpoch())
 	end)
+
+	it("returns absoluteTime as integer nanoseconds, so deltas are exact", function()
+		ctl.now = 0.05
+		ctl.advance(0.15)
+		assert.equal("integer", math.type(hs.timer.absoluteTime()))
+		assert.equal(200000000, hs.timer.absoluteTime())
+	end)
 end)
 
 describe("hs.timer.doAfter", function()
