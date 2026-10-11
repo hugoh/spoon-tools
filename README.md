@@ -26,6 +26,83 @@ uvx --from git+https://github.com/hugoh/spoon-tools spoon-generate-docs
 
 ---
 
+## `hs_mock`
+
+A mock of the Hammerspoon `hs` global for testing Spoons under
+[busted](https://lunarmodules.github.io/busted/). It covers the APIs most Spoons
+share; anything else raises `hs_mock: hs.<name> is not mocked` until the test
+adds it.
+
+**Install** into a project-local tree (the mise Lua tree is shared by every
+repo, so a global install can't be pinned per spoon). Each release attaches a
+rockspec pinned to its tag:
+
+```toml
+# mise.toml
+[tasks.deps]
+run = "luarocks install --tree .rocks https://github.com/hugoh/spoon-tools/releases/download/v1.6.0/hs-mock-1.6.0-1.rockspec"
+
+[tasks.test]
+depends = ["deps"]
+run = "busted test_spec.lua --verbose"
+```
+
+```lua
+-- .busted
+return { _all = { lpath = ".rocks/share/lua/5.4/?.lua;.rocks/share/lua/5.4/?/init.lua" } }
+```
+
+Add `.rocks/` to `.gitignore`.
+
+**Use** a fresh mock per test:
+
+```lua
+local hs_mock = require("hs_mock")
+local hs, ctl, Spoon
+
+before_each(function()
+  hs, ctl = hs_mock.new()
+  _G.hs = hs
+  hs.wifi = { currentNetwork = function() return "home" end } -- add what the spoon also needs
+  Spoon = dofile("init.lua")
+end)
+
+it("polls every minute", function()
+  Spoon:start()
+  ctl.advance(60)
+  assert.same({ "polled" }, ctl.logged("info"))
+end)
+```
+
+**Mocked:** `logger.new`; `timer.doAfter`, `doEvery`, `new`, `secondsSinceEpoch`,
+`absoluteTime`; `task.new`; `menubar.new`; `notify.new`, `activationTypes`;
+`caffeinate.watcher`; `application.find`, `get`, `watcher`; `hotkey.bind`;
+`json.read`, `write`; `fs.attributes`, `mkdir`; `fnutils` (Hammerspoon's own
+code, vendored). Event constants match Hammerspoon 1.1.1.
+
+**Test controls** (`ctl`):
+
+| Control | Effect |
+|---|---|
+| `ctl.now` | Virtual clock in seconds; drives `secondsSinceEpoch` and `absoluteTime` (ns) |
+| `ctl.advance(s)` | Moves the clock, firing due timers in due-time order (ties in scheduling order); `doEvery` and started `timer.new` re-arm |
+| `ctl.flush()` | Fires the one-shot timers pending now, whatever their delay; leaves repeating timers and ones scheduled meanwhile |
+| `ctl.timers()` | Running timers |
+| `ctl.logs`, `ctl.logged(level)` | Every log line at every level (`{ logger, level, message }`), or the messages at one level |
+| `ctl.tasks` | Created tasks; `task:complete(code, stdout, stderr)` calls back. `terminate()` doesn't |
+| `ctl.onTask = fn(task)` | Called on `task:start()`; returning an exit code completes the task at once |
+| `ctl.menubars` | Created menubars (`_title`, `_icon`, `_menu`, `_tooltip`, `_deleted`…); `bar:_click()` |
+| `ctl.notifications`, `ctl.activate(note, type)` | Created notifications (`_attributes`, `_sent`, `_withdrawn`); activation calls back |
+| `ctl.caffeinate(event)`, `ctl.appEvent(name, event, app)` | Delivers to started watchers |
+| `ctl.apps[name]` | What `application.find` / `get` return |
+| `ctl.hotkeys` | Bindings: `mods`, `key`, `message`, `pressed`, `enabled`, `deleted` |
+| `ctl.files[path]`, `ctl.dirs[path]` | The filesystem behind `json` and `fs`; a non-table file value reads as malformed JSON |
+
+`json.read` and `json.write` copy, like real serialization. Releases follow
+this repo's tags; refresh the vendored `fnutils` with `mise run vendor-fnutils <hammerspoon-tag>`.
+
+---
+
 ## Workflows
 
 Lint and tests need nothing spoon-specific — call

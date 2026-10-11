@@ -7,6 +7,9 @@ min_hk_version = Base.min_hk_version
 local linters = new Mapping<String, Step> {
     ...Base.base
     ...Base.python
+    // Vendored upstream file stays byte-identical to Hammerspoon's for easy refresh.
+    ["selene"] = (Builtins.selene) { exclude = "lua/hs_mock/fnutils.lua" }
+    ["stylua"] = (Builtins.stylua) { exclude = "lua/hs_mock/fnutils.lua" }
     ["readme-gen"] = {
         glob = List(
             ".github/workflows/spoon-release.yml",
