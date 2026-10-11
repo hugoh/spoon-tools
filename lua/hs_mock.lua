@@ -320,6 +320,7 @@ function M.new()
 					_streamCallback = type(streamOrArgs) == "function" and streamOrArgs or nil,
 					_args = type(streamOrArgs) == "table" and streamOrArgs or args or {},
 					_running = false,
+					_terminated = false,
 					_pid = 1000 + #ctl.tasks,
 					_ctl = ctl,
 				}, Task)
@@ -330,7 +331,11 @@ function M.new()
 
 		menubar = strict("hs.menubar", {
 			new = function(inMenuBar, autosaveName)
-				local bar = setmetatable({ _inMenuBar = inMenuBar ~= false, _autosaveName = autosaveName }, Menubar)
+				local bar = setmetatable({
+					_inMenuBar = inMenuBar ~= false,
+					_autosaveName = autosaveName,
+					_deleted = false,
+				}, Menubar)
 				table.insert(ctl.menubars, bar)
 				return bar
 			end,
@@ -349,6 +354,8 @@ function M.new()
 				local note = setmetatable({
 					_callback = callback,
 					_attributes = (callback and attributes or fnOrAttributes) or {},
+					_sent = false,
+					_withdrawn = false,
 				}, Notification)
 				table.insert(ctl.notifications, note)
 				return note
