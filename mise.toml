@@ -5,9 +5,6 @@ biome = "2.5.4"
 ghalint = "1.5.6"
 gitleaks = "8.30.1"
 hk = "2.5.0"
-lua = "5.4"
-"aqua:Kampfkarren/selene" = "0.32.0"
-stylua = "2.5.2"
 rumdl = "0.2.78"
 ruff = "0.16.10"
 tombi = "1.7.1"
@@ -19,48 +16,8 @@ zizmor = "1.30.1"
 "github:tj-actions/auto-doc" = "3.6.0"
 
 [tasks.test]
-depends = ["test:*"]
-description = "Run all test suites"
-
-[tasks."test:py"]
 run = "uv run --group dev pytest"
 description = "Run the Python test suite"
-
-[tasks."test:lua"]
-run = "busted"
-description = "Run the hs_mock busted specs"
-
-[tasks."test:rock"]
-description = "Build the hs-mock rock into a scratch tree and require it from there only"
-run = """
-set -e
-tree="$(mktemp -d)"
-trap 'rm -rf "$tree"' EXIT
-luarocks make --tree "$tree" hs-mock-scm-1.rockspec >/dev/null
-lua -e "package.path = '$tree/share/lua/5.4/?.lua'; require('hs_mock').new()"
-echo "hs-mock rock OK"
-"""
-
-[tasks.vendor]
-description = "Refresh the vendored hs.fnutils and hs.inspect from a Hammerspoon release tag"
-usage = 'arg "<tag>" help="Hammerspoon release tag, e.g. 1.1.1"'
-run = """
-set -e
-tag="$usage_tag"
-for module in fnutils inspect; do
-  {
-    echo "-- Vendored unchanged from Hammerspoon $tag extensions/$module/$module.lua (refresh: mise run vendor <tag>)."
-    if [ "$module" = inspect ]; then
-      echo "-- MIT License, Copyright (c) 2013 Enrique García Cota (https://github.com/kikito/inspect.lua)."
-    else
-      echo "-- MIT License, Copyright (c) 2014-2025 Various Contributors (https://github.com/Hammerspoon/hammerspoon)."
-    fi
-    echo
-    curl -fsSL "https://raw.githubusercontent.com/Hammerspoon/hammerspoon/$tag/extensions/$module/$module.lua"
-  } > "lua/hs_mock/$module.lua.new"
-  mv "lua/hs_mock/$module.lua.new" "lua/hs_mock/$module.lua"
-done
-"""
 
 [tasks.gen]
 description = "Regenerate the spoon-release.yml Inputs/Outputs tables in the README"
@@ -81,6 +38,3 @@ set -e
 mise run gen
 git diff --exit-code README.md || { echo 'README tables are out of date — run: mise run gen'; exit 1; }
 """
-
-[hooks]
-postinstall = ["luarocks install busted"]

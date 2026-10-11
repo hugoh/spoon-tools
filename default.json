@@ -11,11 +11,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Bump a spoon's hs-mock rock pin (HS_MOCK_VERSION in mise.toml) to the latest spoon-tools release, which attaches the matching rockspec",
+      "description": "Bump a spoon's hs-mock pin (HS_MOCK_VERSION in mise.toml) to the latest hugoh/hs-mock release, which attaches the matching rockspec",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
       "matchStrings": ["HS_MOCK_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "hs-mock",
-      "packageNameTemplate": "hugoh/spoon-tools",
+      "packageNameTemplate": "hugoh/hs-mock",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.*)$",
       "versioningTemplate": "semver"

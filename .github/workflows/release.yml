@@ -38,5 +38,3 @@ jobs:
       tag: ${{ inputs.tag || '' }}
       bump: ${{ inputs.bump || 'auto' }}
       notes: ${{ inputs.notes || '' }}
-      package-command: luarocks new_version hs-mock-scm-1.rockspec "$VERSION" --tag="$TAG"
-      package-artifacts: hs-mock-[0-9]*-1.rockspec
