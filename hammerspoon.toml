@@ -7,7 +7,10 @@ base = "lua51"
 [hs]
 any = true
 
-# Hammerspoon runs Lua 5.4; table.pack/unpack (5.2+) aren't in the lua51 base.
+# Hammerspoon runs Lua 5.4; math.type (5.3+) and table.pack/unpack (5.2+) aren't in the lua51 base.
+[math.type]
+args = [{ type = "any" }]
+
 [table.pack]
 args = [{ type = "...", required = false }]
 

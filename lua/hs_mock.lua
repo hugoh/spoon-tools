@@ -306,7 +306,7 @@ function M.new()
 
 		timer = strict("hs.timer", {
 			secondsSinceEpoch = function() return ctl.now end,
-			absoluteTime = function() return ctl.now * 1e9 end,
+			absoluteTime = function() return math.floor(ctl.now * 1e9 + 0.5) end,
 			new = function(interval, fn) return newTimer(interval, fn, true) end,
 			doAfter = function(delay, fn) return newTimer(delay, fn, false):start() end,
 			doEvery = function(interval, fn) return newTimer(interval, fn, true):start() end,
