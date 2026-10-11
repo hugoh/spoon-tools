@@ -1,5 +1,0 @@
-std = "hammerspoon"
-
-[lints]
-# stylua keeps guard clauses like `if not ok then return end` on one line.
-multiple_statements = "allow"

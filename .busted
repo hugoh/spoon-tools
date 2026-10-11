@@ -1,4 +1,0 @@
-return {
-	_all = { lpath = "lua/?.lua;lua/?/init.lua" },
-	default = { ROOT = { "spec" } },
-}
