@@ -2,6 +2,7 @@
 -- See README.md ("hs_mock") for usage.
 
 local fnutils = require("hs_mock.fnutils")
+local inspect = require("hs_mock.inspect")
 
 local M = {}
 
@@ -483,6 +484,7 @@ function M.new()
 
 	local hs = strict("hs", {
 		fnutils = fnutils,
+		inspect = inspect,
 
 		logger = strict("hs.logger", {
 			new = function(id, level)

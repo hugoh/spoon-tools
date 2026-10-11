@@ -88,8 +88,8 @@ end)
 `websocket`; `wifi`; `host.interfaceStyle`; `distributednotifications`;
 `spoons.resourcePath` (returns the file unchanged); `application.launchOrFocus`,
 `launchOrFocusByBundleID`, `frontmostApplication`;
-`json.read`, `write`; `fs.attributes`, `mkdir`; `fnutils` (Hammerspoon's own
-code, vendored). Event constants match Hammerspoon 1.1.1.
+`json.read`, `write`; `fs.attributes`, `mkdir`; `fnutils` and `inspect`
+(Hammerspoon's own code, vendored). Event constants match Hammerspoon 1.1.1.
 
 **Test controls** (`ctl`):
 
@@ -132,7 +132,7 @@ exact), when it is deliberately unrealistic (such as a `json.decode` that passes
 tables through), or when an honest shared version would need deep modelling
 (`axuielement` trees, `webview` with its JavaScript bridge, `canvas`). Anything
 generic goes here instead. Releases follow
-this repo's tags; refresh the vendored `fnutils` with `mise run vendor-fnutils <hammerspoon-tag>`.
+this repo's tags; refresh the vendored `fnutils` and `inspect` with `mise run vendor <hammerspoon-tag>`.
 
 ---
 

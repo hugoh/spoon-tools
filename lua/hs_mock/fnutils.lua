@@ -1,4 +1,4 @@
--- Vendored unchanged from Hammerspoon 1.1.1 extensions/fnutils/fnutils.lua (refresh: mise run vendor-fnutils).
+-- Vendored unchanged from Hammerspoon 1.1.1 extensions/fnutils/fnutils.lua (refresh: mise run vendor <tag>).
 -- MIT License, Copyright (c) 2014-2025 Various Contributors (https://github.com/Hammerspoon/hammerspoon).
 
 --- === hs.fnutils ===

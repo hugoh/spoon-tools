@@ -41,19 +41,25 @@ lua -e "package.path = '$tree/share/lua/5.4/?.lua'; require('hs_mock').new()"
 echo "hs-mock rock OK"
 """
 
-[tasks.vendor-fnutils]
-description = "Refresh the vendored hs.fnutils from a Hammerspoon release tag"
+[tasks.vendor]
+description = "Refresh the vendored hs.fnutils and hs.inspect from a Hammerspoon release tag"
 usage = 'arg "<tag>" help="Hammerspoon release tag, e.g. 1.1.1"'
 run = """
 set -e
 tag="$usage_tag"
-{
-  echo "-- Vendored unchanged from Hammerspoon $tag extensions/fnutils/fnutils.lua (refresh: mise run vendor-fnutils)."
-  echo "-- MIT License, Copyright (c) 2014-2025 Various Contributors (https://github.com/Hammerspoon/hammerspoon)."
-  echo
-  curl -fsSL "https://raw.githubusercontent.com/Hammerspoon/hammerspoon/$tag/extensions/fnutils/fnutils.lua"
-} > lua/hs_mock/fnutils.lua.new
-mv lua/hs_mock/fnutils.lua.new lua/hs_mock/fnutils.lua
+for module in fnutils inspect; do
+  {
+    echo "-- Vendored unchanged from Hammerspoon $tag extensions/$module/$module.lua (refresh: mise run vendor <tag>)."
+    if [ "$module" = inspect ]; then
+      echo "-- MIT License, Copyright (c) 2013 Enrique García Cota (https://github.com/kikito/inspect.lua)."
+    else
+      echo "-- MIT License, Copyright (c) 2014-2025 Various Contributors (https://github.com/Hammerspoon/hammerspoon)."
+    fi
+    echo
+    curl -fsSL "https://raw.githubusercontent.com/Hammerspoon/hammerspoon/$tag/extensions/$module/$module.lua"
+  } > "lua/hs_mock/$module.lua.new"
+  mv "lua/hs_mock/$module.lua.new" "lua/hs_mock/$module.lua"
+done
 """
 
 [tasks.gen]
