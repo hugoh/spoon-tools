@@ -82,6 +82,7 @@ end)
 **Mocked:** `logger.new`; `timer.doAfter`, `doEvery`, `new`, `secondsSinceEpoch`,
 `absoluteTime`; `task.new`; `menubar.new`; `notify.new`, `activationTypes`;
 `caffeinate.watcher`; `application.find`, `get`, `watcher`; `hotkey.bind`;
+`audiodevice` (devices, defaults, `watcher`); `image.imageFromName`, `iconForFile`;
 `json.read`, `write`; `fs.attributes`, `mkdir`; `fnutils` (Hammerspoon's own
 code, vendored). Event constants match Hammerspoon 1.1.1.
 
@@ -100,6 +101,10 @@ code, vendored). Event constants match Hammerspoon 1.1.1.
 | `ctl.notifications`, `ctl.activate(note, type)` | Created notifications (`_attributes`, `_sent`, `_withdrawn`); activation calls back |
 | `ctl.caffeinate(event)`, `ctl.appEvent(name, event, app)` | Delivers to started watchers |
 | `ctl.apps[name]` | What `application.find` / `get` return |
+| `ctl.addAudioDevice{ name, uid, input, transport, muted, volume, inUse }` | Adds an output (or `input = true`) device; `uid` defaults to `name` |
+| `ctl.audio.defaultOutput`, `ctl.audio.defaultInput` | The default devices; `setDefault*Device()` updates them |
+| `ctl.audioEvent(event)`, `ctl.deviceEvent(device, event, scope, element)` | Fires the running `audiodevice.watcher`, or a watching device's callback |
+| `ctl.images[nameOrPath]` | What `image.imageFromName` / `iconForFile` return; unknown names give `nil`, as in Hammerspoon |
 | `ctl.hotkeys` | Bindings: `mods`, `key`, `message`, `pressed`, `enabled`, `deleted` |
 | `ctl.files[path]`, `ctl.dirs[path]` | The filesystem behind `json` and `fs`; a non-table file value reads as malformed JSON |
 
