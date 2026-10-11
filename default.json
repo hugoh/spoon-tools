@@ -5,20 +5,7 @@
     {
       "matchManagers": ["mise"],
       "matchDepNames": ["lua"],
-      "allowedVersions": "< 5.5"
-    }
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Bump a spoon's hs-mock pin (HS_MOCK_VERSION in mise.toml) to the latest hugoh/hs-mock release, which attaches the matching rockspec",
-      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["HS_MOCK_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
-      "depNameTemplate": "hs-mock",
-      "packageNameTemplate": "hugoh/hs-mock",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.*)$",
-      "versioningTemplate": "semver"
+      "allowedVersions": ">= 5.4 < 5.5"
     }
   ]
 }
