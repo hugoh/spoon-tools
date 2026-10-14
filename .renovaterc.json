@@ -1,4 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>hugoh/renovate-config"]
+  "extends": ["github>hugoh/renovate-config"],
+  "packageRules": [
+    {
+      "description": "spoon-release.yml is the reusable workflow the spoons call, so an action bump there only reaches them once a new spoon-tools tag is cut: type it `fix` so `cog bump --auto` releases it. Bumps in this repo's own CI workflows stay `chore`.",
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/workflows/spoon-release.yml"],
+      "semanticCommitType": "fix"
+    }
+  ]
 }
