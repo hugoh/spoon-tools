@@ -26,8 +26,11 @@ on: # yamllint disable-line rule:truthy
         required: false
         type: string
 
-permissions:
-  contents: write
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-caller-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
