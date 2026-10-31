@@ -11,7 +11,7 @@ tombi = "1.7.1"
 "github:owenlamont/ryl" = "0.26.1"
 typos = "1.50.3"
 ty = "0.0.84"
-uv = "0.13.1"
+uv = "0.13.5"
 "github:tj-actions/auto-doc" = "3.6.0"
 
 [tasks.test]
