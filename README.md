@@ -132,18 +132,21 @@ jobs:
       bump: ${{ inputs.bump }}
 ```
 
+A spoon that ships a native macOS binary builds it inside its `mise run package` task and sets `runs_on: macos-latest`; only the release job moves to macOS, and the docs deploy stays on Linux.
+
 The calling repo must have GitHub Pages enabled (source: GitHub Actions) and the `github-pages` environment configured.
 
 #### Inputs
 
 <!-- AUTO-DOC-INPUT:START - Do not remove or modify this section -->
 
-|   INPUT    | REQUIRED | DEFAULT  |                                                         DESCRIPTION                                                         |
-|------------|----------|----------|-----------------------------------------------------------------------------------------------------------------------------|
-|    bump    |  false   | `"auto"` | Force the bump level instead of deriving it from the commits: auto (default), patch, minor, major. Ignored when tag is set. |
-| docs_only  |  false   | `false`  |      Regenerate and redeploy the Pages docs only; no bump, no GitHub Release. Uses `tag`, or the latest tag if empty.       |
-| spoon_name |   true   |          |                Spoon name (e.g. AudioPilot) — used for the zip filename and must match obj.name in init.lua                 |
-|    tag     |  false   |          |         Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use.          |
+|   INPUT    | REQUIRED |      DEFAULT      |                                                                DESCRIPTION                                                                 |
+|------------|----------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+|    bump    |  false   |     `"auto"`      |        Force the bump level instead of deriving it from the commits: auto (default), patch, minor, major. Ignored when tag is set.         |
+| docs_only  |  false   |      `false`      |              Regenerate and redeploy the Pages docs only; no bump, no GitHub Release. Uses `tag`, or the latest tag if empty.              |
+|  runs_on   |  false   | `"ubuntu-latest"` | Runner label for the release job (the one that runs `mise run package`). Use macos-latest for a spoon that packages a native macOS binary. |
+| spoon_name |   true   |                   |                        Spoon name (e.g. AudioPilot) — used for the zip filename and must match obj.name in init.lua                        |
+|    tag     |  false   |                   |                 Existing tag to (re-)release; skips the Conventional-Commit bump. Leave empty for normal push-to-main use.                 |
 
 <!-- AUTO-DOC-INPUT:END -->
 
