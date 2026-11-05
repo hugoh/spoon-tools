@@ -19,6 +19,12 @@ on:
         description: Regenerate and redeploy the Pages docs only; no bump, no GitHub Release. Uses `tag`, or the latest tag if empty.
         type: boolean
         default: false
+      runs_on:
+        description: >-
+          Runner label for the release job (the one that runs `mise run package`).
+          Use macos-latest for a spoon that packages a native macOS binary.
+        type: string
+        default: ubuntu-latest
 
 permissions:
   contents: read
@@ -32,7 +38,7 @@ concurrency:
 jobs:
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs_on }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -71,7 +77,9 @@ jobs:
           TAG: ${{ steps.resolve.outputs.tag }}
         run: |
           VERSION="${TAG#v}"
-          sed -i "s/obj.version = \"[^\"]*\"/obj.version = \"$VERSION\"/" init.lua
+          # -i.bak plus rm works with both GNU sed (Linux) and BSD sed (macOS).
+          sed -i.bak "s/obj.version = \"[^\"]*\"/obj.version = \"$VERSION\"/" init.lua
+          rm init.lua.bak
 
       - name: Package Spoon
         if: steps.resolve.outputs.tag != ''
