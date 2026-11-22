@@ -42,7 +42,7 @@ jobs:
       packages: read
       statuses: write
     steps:
-      - uses: hugoh/gh-workflows/setup@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+      - uses: hugoh/gh-workflows/setup@0fb46042e4562ccf11f83bacc6c916d281379700 # v1.40.25
       - name: Run tests
         run: mise run test
 
@@ -54,10 +54,10 @@ jobs:
       statuses: write
     runs-on: ubuntu-latest
     steps:
-      - uses: hugoh/gh-workflows/setup@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+      - uses: hugoh/gh-workflows/setup@0fb46042e4562ccf11f83bacc6c916d281379700 # v1.40.25
       - name: Sync Python dependencies
         run: uv sync --group dev
-      - uses: hugoh/gh-workflows/hk-check@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+      - uses: hugoh/gh-workflows/hk-check@0fb46042e4562ccf11f83bacc6c916d281379700 # v1.40.25
         env:
           PINACT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -75,7 +75,7 @@ jobs:
   release:
     needs: ci-gate
     if: github.event_name != 'pull_request'
-    uses: hugoh/gh-workflows/.github/workflows/release.yml@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+    uses: hugoh/gh-workflows/.github/workflows/release.yml@0fb46042e4562ccf11f83bacc6c916d281379700 # v1.40.25
     permissions:
       contents: write
     with:
