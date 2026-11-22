@@ -3,14 +3,34 @@ name: CI
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-caller-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on: # yamllint disable-line rule:truthy
   push:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to create a GitHub Release for; skips the bump
+        required: false
+        type: string
+      bump:
+        description: Force the bump level (auto = derive from commits). Ignored when tag is set.
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+      notes:
+        description: "Release notes body (default: GitHub auto-generated notes)"
+        required: false
+        type: string
 
 jobs:
   check:
@@ -25,3 +45,40 @@ jobs:
       - uses: hugoh/gh-workflows/setup@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
       - name: Run tests
         run: mise run test
+
+  lint:
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hugoh/gh-workflows/setup@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+      - name: Sync Python dependencies
+        run: uv sync --group dev
+      - uses: hugoh/gh-workflows/hk-check@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+        env:
+          PINACT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ci-gate:
+    if: always()
+    needs: [check, lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  release:
+    needs: ci-gate
+    if: github.event_name != 'pull_request'
+    uses: hugoh/gh-workflows/.github/workflows/release.yml@30ea88e8815001f26c86977d2ba60ddddebf42e0 # v1.40.23
+    permissions:
+      contents: write
+    with:
+      tag: ${{ inputs.tag || '' }}
+      bump: ${{ inputs.bump || 'auto' }}
+      notes: ${{ inputs.notes || '' }}

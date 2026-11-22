@@ -37,63 +37,17 @@ below bumps a spoon's `HS_MOCK_VERSION` pin from its releases.
 
 ## Workflows
 
-Lint and tests need nothing spoon-specific — call
-[`hugoh/gh-workflows`](https://github.com/hugoh/gh-workflows) directly.
+A spoon uses one `ci.yml`: lint and tests need nothing spoon-specific (call
+[`hugoh/gh-workflows`](https://github.com/hugoh/gh-workflows) directly), a
+`ci-gate` job aggregates them, and `release` runs only once the gate passes.
+`ci-gate` is the single required status check.
 
-### `hk.yml` — lint checks
-
-```yaml
-name: hk
-on:
-  push:
-    branches: [main, renovate/**]
-  pull_request:
-
-permissions:
-  contents: read
-  packages: read
-  statuses: write
-
-jobs:
-  check:
-    uses: hugoh/gh-workflows/.github/workflows/hk.yml@<pinned-sha>
-    permissions:
-      contents: read
-      packages: read
-      statuses: write
-```
-
-### `tests.yml` — Lua tests
+### `ci.yml` — checks, gate, release
 
 `setup` (checkout + mise) then `mise run test` (busted). Interleave any extra
 step — e.g. AudioPilot vendors JS deps first.
 
-```yaml
-name: Tests
-on:
-  push:
-    branches: [main, renovate/**]
-  pull_request:
-
-permissions:
-  contents: read
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-      cancel-in-progress: true
-    steps:
-      - uses: hugoh/gh-workflows/setup@<pinned-sha>
-      # - run: mise run vendor   # AudioPilot only
-      - run: mise run test
-```
-
-### `spoon-release.yml` — tag, release, deploy docs
-
-The one workflow with spoon-specific glue: on push to `main` it runs the
+The release calls `spoon-release.yml` below: on push to `main` it runs the
 Conventional-Commit bump ([`hugoh/cog-bump`](https://github.com/hugoh/cog-bump)),
 and when that yields a new tag it stamps `obj.version` into `init.lua`, packages
 the spoon zip, creates a GitHub Release, and deploys `docs/` to GitHub Pages.
@@ -101,14 +55,23 @@ Chore-only merges bump nothing and the job is a no-op — dispatch with
 `bump: patch` to force a release from such history.
 
 ```yaml
-name: Release
+name: ci
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-caller-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to (re-)release; leave empty for normal use
+        description: Tag to release (used to backfill a missed release; leave empty for normal use)
         required: false
         type: string
       bump:
@@ -117,19 +80,55 @@ on:
         type: choice
         default: auto
         options: [auto, patch, minor, major]
-
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+      docs_only:
+        description: Regenerate and redeploy the Pages docs only (no bump, no release)
+        required: false
+        type: boolean
+        default: false
 
 jobs:
+  check:
+    uses: hugoh/gh-workflows/.github/workflows/hk.yml@<pinned-sha>
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: hugoh/gh-workflows/setup@<pinned-sha>
+      # - run: mise run vendor   # AudioPilot only
+      - run: mise run test
+
+  ci-gate:
+    if: always()
+    needs: [check, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: re-actors/alls-green@<pinned-sha>
+        with:
+          jobs: ${{ toJSON(needs) }}
+
   release:
+    needs: ci-gate
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     uses: hugoh/spoon-tools/.github/workflows/spoon-release.yml@<pinned-sha>
     with:
       spoon_name: MySpoon   # must match obj.name in init.lua
       tag: ${{ inputs.tag }}
       bump: ${{ inputs.bump }}
+      docs_only: ${{ inputs.docs_only == true }}
 ```
 
 A spoon that ships a native macOS binary builds it inside its `mise run package` task and sets `runs_on: macos-latest`; only the release job moves to macOS, and the docs deploy stays on Linux.
