@@ -45,7 +45,7 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
     steps:
-      - uses: hugoh/gh-workflows/setup@9e05d43efa7f4b2824cea8b1feefafa68010f80a # v1.40.26
+      - uses: hugoh/gh-workflows/setup@8d17bc6b4d7edc0bbec893e0466eb0ba60728721 # v1.40.27
         with:
           fetch-depth: "0"
 
